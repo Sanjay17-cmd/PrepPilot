@@ -8,7 +8,7 @@ export const COMMON_NAV: NavigationItem[] = [
   { id: 'dashboard',   label: 'Dashboard',        path: '/dashboard',   icon: 'LayoutDashboard' },
   { id: 'assessment',  label: 'Where Are We?',    path: '/assessment',  icon: 'ClipboardCheck' },
   { id: 'roadmap',     label: 'Roadmap',          path: '/roadmap',     icon: 'Map' },
-  { id: 'daily',       label: 'Daily Plan',       path: '/daily',       icon: 'CalendarCheck' },
+  { id: 'tasks',       label: 'Tasks',            path: '/tasks',       icon: 'CalendarCheck' },
   { id: 'dsa',         label: 'DSA Tracker',      path: '/dsa',         icon: 'Code2' },
   { id: 'progress',    label: 'Progress',         path: '/progress',    icon: 'TrendingUp' },
   { id: 'canvas',      label: 'Learning Canvas',  path: '/canvas',      icon: 'MonitorPlay' },

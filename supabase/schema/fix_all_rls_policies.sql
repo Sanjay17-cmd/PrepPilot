@@ -574,6 +574,7 @@ CREATE POLICY "Student owns resume_analyses" ON public.resume_analyses
   FOR ALL USING (student_id = auth.uid()) WITH CHECK (student_id = auth.uid());
 
 -- leetcode_problems
+ALTER TABLE public.leetcode_problems ADD COLUMN IF NOT EXISTS code text;
 ALTER TABLE public.leetcode_problems ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Student owns leetcode_problems" ON public.leetcode_problems;
 CREATE POLICY "Student owns leetcode_problems" ON public.leetcode_problems

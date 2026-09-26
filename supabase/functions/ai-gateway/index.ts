@@ -20,6 +20,7 @@ const SUPPORTED_FEATURES = new Set([
   'mcq_generation',
   'roadmap_generation',
   'daily_plan_generation',
+  'daily_plan',
   // Phase 3
   'ai_coach',
   'resume_analysis',
@@ -453,7 +454,8 @@ serve(async (req) => {
     switch (feature) {
       case 'mcq_generation':        prompt = buildMCQPrompt(body);           break
       case 'roadmap_generation':    prompt = buildRoadmapPrompt(body);       break
-      case 'daily_plan_generation': prompt = buildDailyPlanPrompt(body);     break
+      case 'daily_plan_generation':
+      case 'daily_plan':            prompt = buildDailyPlanPrompt(body);     break
       case 'ai_coach':              prompt = buildCoachPrompt(body);          break
       case 'resume_analysis':       prompt = buildResumeAnalysisPrompt(body);break
       case 'canvas_generation':     prompt = buildCanvasPrompt(body);        break

@@ -40,6 +40,64 @@ export interface RoadmapWithPhases {
 // -------------------------------------------------------------------------
 // AI Gateway request — generates roadmap via Gemini
 // -------------------------------------------------------------------------
+function getStarterCurriculum(roleName: string, dailyMinutes: number): RoadmapPhase[] {
+  const mins = dailyMinutes || 60
+  return [
+    {
+      title: 'Phase 1: Language Mastery & Core CS',
+      description: `Solidify core programming foundations, language mechanics, and memory models for ${roleName}.`,
+      duration_days: 14,
+      display_order: 1,
+      status: 'not_started',
+      topics: [
+        { topic: 'Language Syntax & Data Types', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Object-Oriented Programming (OOP)', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Arrays, Strings & Hash Tables', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'DBMS & Relational SQL', priority: 'medium', estimated_minutes: mins, status: 'not_started' },
+      ],
+    },
+    {
+      title: 'Phase 2: Data Structures & Core Algorithms',
+      description: 'Master key placement problem-solving patterns: two pointers, stacks, queues, and recursion.',
+      duration_days: 21,
+      display_order: 2,
+      status: 'not_started',
+      topics: [
+        { topic: 'Linked Lists, Stacks & Queues', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Binary Search & Sorting Patterns', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Recursion & Backtracking', priority: 'medium', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Operating Systems & Threading', priority: 'medium', estimated_minutes: mins, status: 'not_started' },
+      ],
+    },
+    {
+      title: 'Phase 3: Trees, Graphs & Advanced Patterns',
+      description: 'Tackle non-linear structures, graph traversals, and dynamic programming fundamentals.',
+      duration_days: 21,
+      display_order: 3,
+      status: 'not_started',
+      topics: [
+        { topic: 'Binary Trees & BST Traversals', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'BFS, DFS & Graph Algorithms', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Dynamic Programming Patterns', priority: 'medium', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Computer Networks & HTTP', priority: 'medium', estimated_minutes: mins, status: 'not_started' },
+      ],
+    },
+    {
+      title: 'Phase 4: Placement Readiness & Mock Interviews',
+      description: 'System design basics, resume review, mock assessment MCQs, and final interview prep.',
+      duration_days: 14,
+      display_order: 4,
+      status: 'not_started',
+      topics: [
+        { topic: 'System Design & Scalability Basics', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Timed MCQ Speed Drills', priority: 'high', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Resume ATS Alignment & Project Q&A', priority: 'medium', estimated_minutes: mins, status: 'not_started' },
+        { topic: 'Behavioral & HR Prep', priority: 'medium', estimated_minutes: mins, status: 'not_started' },
+      ],
+    },
+  ]
+}
+
 export async function generateRoadmapViaAI(
   studentId: string,
   roleName: string,
@@ -47,37 +105,54 @@ export async function generateRoadmapViaAI(
   skills: SkillRow[],
   dailyMinutes: number,
 ): Promise<{ phases: RoadmapPhase[]; aiRunId: string }> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
-
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-  const resp = await fetch(`${supabaseUrl}/functions/v1/ai-gateway`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify({
-      feature: 'roadmap_generation',
+  const { data: raw, error: fnErr } = await supabase.functions.invoke('ai-gateway', {
+    body: {
+      feature:    'roadmap_generation',
       student_id: studentId,
-      input: {
-        role_name: roleName,
-        role_slug: roleSlug,
+      student_state: {
+        role_name:     roleName,
+        role_slug:     roleSlug,
         skills,
         daily_minutes: dailyMinutes,
-        weak_topics: skills.filter(s => s.score < 50).map(s => s.topic),
+        weak_topics:   skills.filter(s => s.score < 50).map(s => s.topic),
         strong_topics: skills.filter(s => s.score >= 70).map(s => s.topic),
       },
-    }),
+    },
   })
 
-  if (!resp.ok) {
-    const err = await resp.text()
-    throw new Error(`Roadmap generation failed: ${err}`)
+  let result = raw
+  if (fnErr || !result) {
+    console.warn('[Roadmap] Gateway error or empty response, using starter curriculum:', fnErr?.message)
+    return {
+      phases:  getStarterCurriculum(roleName, dailyMinutes),
+      aiRunId: '',
+    }
   }
 
-  const result = await resp.json()
-  const phases: RoadmapPhase[] = result.phases ?? []
+  // Handle both { roadmap: { phases } } and { phases }
+  const rawPhases: any[] = result.phases ?? result.roadmap?.phases ?? (Array.isArray(result) ? result : [])
+
+  const phases: RoadmapPhase[] = rawPhases.map((p, i) => ({
+    title:         String(p.title || `Phase ${i + 1}`),
+    description:   String(p.description || ''),
+    duration_days: Number(p.duration_days || 14),
+    display_order: Number(p.display_order ?? (i + 1)),
+    status:        'not_started',
+    topics: (p.topics || []).map((t: any) => ({
+      topic:             String(t.topic || t.name || 'Core Fundamentals'),
+      priority:          (t.priority === 'high' || t.priority === 'low') ? t.priority : 'medium',
+      estimated_minutes: Number(t.estimated_minutes || dailyMinutes || 60),
+      status:            'not_started',
+    })),
+  }))
+
+  if (phases.length === 0) {
+    return {
+      phases:  getStarterCurriculum(roleName, dailyMinutes),
+      aiRunId: result.ai_run_id ?? '',
+    }
+  }
+
   return { phases, aiRunId: result.ai_run_id ?? '' }
 }
 

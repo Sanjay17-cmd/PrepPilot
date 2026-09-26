@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS public.leetcode_problems (
                  CHECK (status IN ('solved','attempted','reviewing')),
   solved_at    TIMESTAMPTZ,
   notes        TEXT,
+  code         TEXT,
   metadata_json JSONB DEFAULT '{}',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),

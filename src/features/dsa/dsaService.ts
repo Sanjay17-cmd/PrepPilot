@@ -16,6 +16,7 @@ export interface DSAProblem {
   status: 'solved' | 'attempted' | 'reviewing'
   solved_at: string | null
   notes: string | null
+  code: string | null
   created_at: string
 }
 
@@ -39,6 +40,7 @@ export async function addProblem(
     topic: string
     status: 'solved' | 'attempted' | 'reviewing'
     notes?: string
+    code?: string
   },
 ): Promise<DSAProblem> {
   const { data: row, error } = await supabase
@@ -53,6 +55,7 @@ export async function addProblem(
         status:     data.status,
         solved_at:  data.status === 'solved' ? new Date().toISOString() : null,
         notes:      data.notes || null,
+        code:       data.code || null,
       },
       { onConflict: 'student_id,title' },
     )
@@ -85,11 +88,12 @@ export async function loadProblems(
 // ─── Update problem ────────────────────────────────────────────────────────────
 export async function updateProblem(
   problemId: string,
-  updates: Partial<Pick<DSAProblem, 'status' | 'notes' | 'difficulty' | 'topic'>>,
+  updates: Partial<Pick<DSAProblem, 'status' | 'notes' | 'code' | 'difficulty' | 'topic' | 'title' | 'url'>>,
 ): Promise<void> {
   const payload: Record<string, unknown> = { ...updates }
   if (updates.status === 'solved') payload.solved_at = new Date().toISOString()
-  await supabase.from('leetcode_problems').update(payload).eq('id', problemId)
+  const { error } = await supabase.from('leetcode_problems').update(payload).eq('id', problemId)
+  if (error) throw new Error(error.message)
 }
 
 // ─── Delete problem ────────────────────────────────────────────────────────────

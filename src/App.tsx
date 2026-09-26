@@ -74,6 +74,7 @@ export default function App() {
               <Route path="/dashboard"  element={<DashboardPage />} />
               <Route path="/assessment" element={<AssessmentPage />} />
               <Route path="/roadmap"    element={<RoadmapPage />} />
+              <Route path="/tasks"      element={<DailyPlanPage />} />
               <Route path="/daily"      element={<DailyPlanPage />} />
               <Route path="/dsa"        element={<DSAPage />} />
               <Route path="/progress"   element={<ProgressPage />} />

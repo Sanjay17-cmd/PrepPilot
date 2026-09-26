@@ -248,31 +248,48 @@ export function RoadmapPage() {
 
       {/* Phase list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-        {roadmap.phases.map((phase, phaseIdx) => {
-          const key = phase.id ?? String(phaseIdx)
-          const expanded = !!expandedPhases[key]
-          const phaseCompletedTopics = phase.topics.filter(t => t.status === 'completed').length
-          const phasePct = phase.topics.length > 0
-            ? Math.round((phaseCompletedTopics / phase.topics.length) * 100)
-            : 0
+        {roadmap.phases.length === 0 ? (
+          <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-gray-300)' }}>
+            <Map size={36} style={{ margin: '0 auto var(--space-3)', color: 'var(--text-tertiary)' }} />
+            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+              No phases generated yet for this roadmap
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', maxWidth: 480, margin: '0 auto var(--space-4)' }}>
+              Your roadmap has been initialized. Click below to generate all structured preparation phases, topics, and timelines.
+            </p>
+            <Button variant="primary" onClick={doGenerate} loading={generating}>
+              <Zap size={16} style={{ marginRight: '6px' }} />
+              Generate Roadmap Phases
+            </Button>
+          </div>
+        ) : (
+          roadmap.phases.map((phase, phaseIdx) => {
+            const key = phase.id ?? String(phaseIdx)
+            const expanded = !!expandedPhases[key]
+            const phaseCompletedTopics = phase.topics.filter(t => t.status === 'completed').length
+            const phasePct = phase.topics.length > 0
+              ? Math.round((phaseCompletedTopics / phase.topics.length) * 100)
+              : 0
 
-          return (
-            <div key={key} className={`roadmap-phase-card ${phase.status === 'completed' ? 'completed' : ''}`}>
-              {/* Phase header */}
-              <div className="roadmap-phase-header" onClick={() => togglePhase(key)}>
-                <div className="roadmap-phase-header__left">
-                  <div className="roadmap-phase-number">{phaseIdx + 1}</div>
-                  <div>
-                    <div className="roadmap-phase-title">{phase.title}</div>
-                    {phase.duration_days && (
-                      <div className="roadmap-phase-meta">
-                        <Clock size={12} /> {phase.duration_days} days
-                        {phase.description && <span style={{ margin: '0 6px' }}>·</span>}
-                        {phase.description && <span>{phase.description}</span>}
+            return (
+              <div key={key} className={`roadmap-phase-card ${phase.status === 'completed' ? 'completed' : ''}`}>
+                {/* Phase header */}
+                <div className="roadmap-phase-header" onClick={() => togglePhase(key)}>
+                  <div className="roadmap-phase-header__left">
+                    <div className="roadmap-phase-number">{phaseIdx + 1}</div>
+                    <div>
+                      <div className="roadmap-phase-title">{phase.title}</div>
+                      <div className="roadmap-phase-meta" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                        {phase.duration_days ? (
+                          <>
+                            <Clock size={12} /> <span>{phase.duration_days} days</span>
+                          </>
+                        ) : null}
+                        {phase.duration_days && phase.description ? <span>·</span> : null}
+                        {phase.description ? <span>{phase.description}</span> : null}
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
                 <div className="roadmap-phase-header__right">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                     {STATUS_ICON[phase.status] ?? STATUS_ICON['not_started']}
@@ -302,43 +319,49 @@ export function RoadmapPage() {
               {/* Topics */}
               {expanded && (
                 <div className="roadmap-topics-list">
-                  {phase.topics.map((topic, tIdx) => (
-                    <div key={topic.id ?? tIdx} className="roadmap-topic-row">
-                      <div className="roadmap-topic-row__left">
-                        <div
-                          className="roadmap-topic-priority-dot"
-                          style={{ background: PRIORITY_COLORS[topic.priority] ?? 'var(--color-gray-400)' }}
-                          title={`${topic.priority} priority`}
-                        />
-                        <span className="roadmap-topic-name"
-                          style={{ textDecoration: topic.status === 'completed' ? 'line-through' : 'none', opacity: topic.status === 'completed' ? 0.5 : 1 }}>
-                          {topic.topic}
-                        </span>
-                        {topic.priority === 'high' && (
-                          <Star size={11} color="var(--color-warning-600)" fill="var(--color-warning-600)" />
-                        )}
-                      </div>
-                      <div className="roadmap-topic-row__right">
-                        {topic.estimated_minutes && (
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                            ~{topic.estimated_minutes}m
+                  {phase.topics && phase.topics.length > 0 ? (
+                    phase.topics.map((topic, tIdx) => (
+                      <div key={topic.id ?? tIdx} className="roadmap-topic-row">
+                        <div className="roadmap-topic-row__left">
+                          <div
+                            className="roadmap-topic-priority-dot"
+                            style={{ background: PRIORITY_COLORS[topic.priority] ?? 'var(--color-gray-400)' }}
+                            title={`${topic.priority} priority`}
+                          />
+                          <span className="roadmap-topic-name"
+                            style={{ textDecoration: topic.status === 'completed' ? 'line-through' : 'none', opacity: topic.status === 'completed' ? 0.5 : 1 }}>
+                            {topic.topic}
                           </span>
-                        )}
-                        <span className={`badge badge--${
-                          topic.status === 'completed' ? 'success'
-                          : topic.status === 'in_progress' ? 'info'
-                          : 'default'
-                        }`} style={{ textTransform: 'capitalize', fontSize: '10px', padding: '2px 8px' }}>
-                          {topic.status.replace('_', ' ')}
-                        </span>
+                          {topic.priority === 'high' && (
+                            <Star size={11} color="var(--color-warning-600)" fill="var(--color-warning-600)" />
+                          )}
+                        </div>
+                        <div className="roadmap-topic-row__right">
+                          {topic.estimated_minutes && (
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                              ~{topic.estimated_minutes}m
+                            </span>
+                          )}
+                          <span className={`badge badge--${
+                            topic.status === 'completed' ? 'success'
+                            : topic.status === 'in_progress' ? 'info'
+                            : 'default'
+                          }`} style={{ textTransform: 'capitalize', fontSize: '10px', padding: '2px 8px' }}>
+                            {topic.status.replace('_', ' ')}
+                          </span>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)' }}>
+                      No sub-topics listed for this phase.
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
           )
-        })}
+        }))}
       </div>
 
       {/* Confirm regenerate modal */}
