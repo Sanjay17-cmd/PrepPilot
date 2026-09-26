@@ -25,6 +25,9 @@ const SUPPORTED_FEATURES = new Set([
   'ai_coach',
   'resume_analysis',
   'canvas_generation',
+  // Mock Interview
+  'mock_interview_turn',
+  'mock_interview_evaluate',
 ])
 
 // Active model candidates in priority order (Google retired gemini-1.5-flash)
@@ -36,7 +39,7 @@ const CANDIDATE_MODELS = [
 ]
 
 // Features for which we NEVER use the output cache (always fresh)
-const NO_CACHE_FEATURES = new Set(['ai_coach'])
+const NO_CACHE_FEATURES = new Set(['ai_coach', 'mock_interview_turn', 'mock_interview_evaluate'])
 
 // -------------------------------------------------------------------------
 // Gemini call with multi-key and multi-model fallback
@@ -380,6 +383,88 @@ Rules:
 }
 
 // -------------------------------------------------------------------------
+// Mock Interview Prompts
+// -------------------------------------------------------------------------
+function buildMockInterviewTurnPrompt(body: Record<string, unknown>): string {
+  const roleName = (body.role_name as string) ?? 'Software Engineer'
+  const interviewType = (body.interview_type as string) ?? 'technical'
+  const difficulty = (body.difficulty as string) ?? 'entry_level'
+  const questionNumber = Number(body.question_number ?? 1)
+  const totalQuestions = Number(body.total_questions ?? 5)
+  const history = (body.history as Array<{ speaker: string; text: string }>) ?? []
+  const candidateLastAnswer = (body.candidate_last_answer as string) ?? ''
+
+  const transcript = history
+    .map(h => `${h.speaker === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${h.text}`)
+    .join('\n')
+
+  return `You are an expert, professional, and encouraging placement interviewer conducting a realistic mock interview for a ${roleName} position.
+Interview Category: ${interviewType} (${difficulty} level).
+Interview Progress: Turn ${questionNumber} of ${totalQuestions}.
+
+Conversation history:
+${transcript || '(The interview has just begun.)'}
+
+Candidate's most recent answer:
+"${candidateLastAnswer || '(Beginning of interview — introduce yourself and ask question 1)'}"
+
+Instructions:
+1. If this is question 1, warmly welcome the candidate, introduce yourself, and ask your first interview question.
+2. If the candidate just answered, briefly acknowledge their answer in a conversational tone (e.g. "Good insight on indexing," or "I see your point on trade-offs"), and then ask either a targeted follow-up question or the next question.
+3. Keep your spoken response natural, concise (2 to 4 sentences), and conversational. It will be spoken out loud via text-to-speech. Do NOT include markdown formatting, bullet points, or code blocks in the spoken response.
+4. If question ${questionNumber} >= ${totalQuestions}, wrap up the interview gracefully, thank the candidate, and let them know that their feedback evaluation is now being compiled.
+
+Return ONLY valid JSON matching this schema:
+{
+  "response": "<The exact spoken words to be voiced aloud to the candidate>",
+  "feedback_note": "<Brief 1-sentence analytical note on their previous answer>",
+  "question_number": ${questionNumber},
+  "is_final": ${questionNumber >= totalQuestions},
+  "suggested_topic": "<The core topic being tested in this question>"
+}`
+}
+
+function buildMockInterviewEvaluatePrompt(body: Record<string, unknown>): string {
+  const roleName = (body.role_name as string) ?? 'Software Engineer'
+  const interviewType = (body.interview_type as string) ?? 'technical'
+  const difficulty = (body.difficulty as string) ?? 'entry_level'
+  const transcript = (body.transcript as Array<{ speaker: string; text: string }>) ?? []
+
+  const formattedTranscript = transcript
+    .map((t, i) => `${i + 1}. [${t.speaker.toUpperCase()}]: ${t.text}`)
+    .join('\n\n')
+
+  return `You are a Senior Interview Bar Raiser evaluating a candidate's complete placement mock interview.
+Role: ${roleName}
+Interview Category: ${interviewType} (${difficulty} level)
+
+Full Interview Transcript:
+${formattedTranscript}
+
+Evaluate the candidate thoroughly and constructively.
+Return ONLY valid JSON matching this exact schema:
+{
+  "overall_score": <integer from 40 to 98>,
+  "technical_score": <integer from 40 to 98>,
+  "communication_score": <integer from 40 to 98>,
+  "confidence_score": <integer from 40 to 98>,
+  "verdict": "<Strong Hire|Hire|Lean Hire|Needs Work>",
+  "summary": "<2-3 paragraph detailed evaluation of how the candidate performed>",
+  "key_strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "areas_for_improvement": ["<improvement 1>", "<improvement 2>", "<improvement 3>"],
+  "question_evaluations": [
+    {
+      "question": "<question asked>",
+      "candidate_answer": "<summary of candidate's answer>",
+      "rating": "<excellent|good|average|needs_work>",
+      "feedback": "<detailed critique of what went well and what was missed>"
+    }
+  ],
+  "recommended_topics": ["<topic 1 to study>", "<topic 2 to study>", "<topic 3 to study>"]
+}`
+}
+
+// -------------------------------------------------------------------------
 // Hash a request body deterministically for cache lookup
 // -------------------------------------------------------------------------
 function hashRequest(body: unknown): string {
@@ -459,6 +544,8 @@ serve(async (req) => {
       case 'ai_coach':              prompt = buildCoachPrompt(body);          break
       case 'resume_analysis':       prompt = buildResumeAnalysisPrompt(body);break
       case 'canvas_generation':     prompt = buildCanvasPrompt(body);        break
+      case 'mock_interview_turn':   prompt = buildMockInterviewTurnPrompt(body); break
+      case 'mock_interview_evaluate': prompt = buildMockInterviewEvaluatePrompt(body); break
       default: throw new Error(`Unknown feature: ${feature}`)
     }
 

@@ -6,6 +6,7 @@
 import { supabase } from '../../lib/supabase'
 import type { CoachOperation, ProposedPatch } from '../../config/aiFeatures'
 import { ALLOWED_OPERATIONS } from '../../config/aiFeatures'
+import { ensureTodayPlan, addCustomTask } from '../daily/dailyPlanService'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface PatchPreview {
@@ -90,6 +91,11 @@ export async function buildPreview(
       if (!task) continue
       before.push({ type: 'task', title: task.title, status: 'exists' })
       after.push({ type: 'task', title: task.title, status: 'removed' })
+    }
+
+    if (op.operation === 'add_task') {
+      before.push({ type: 'task', title: '(None)', status: 'not scheduled' })
+      after.push({ type: 'task', title: op.task_title || 'New Task', status: 'pending' })
     }
   }
 
@@ -231,6 +237,16 @@ async function executeOperation(studentId: string, op: CoachOperation): Promise<
       if (!op.new_name) throw new Error('No new name provided')
       await supabase.from('roadmaps').update({ name: op.new_name })
         .eq('student_id', studentId).eq('status', 'active')
+      break
+    }
+    case 'add_task': {
+      const plan = await ensureTodayPlan(studentId)
+      await addCustomTask(plan.id, studentId, {
+        title: op.task_title || 'Coach Recommended Task',
+        topic: op.topic || 'AI Coach Recommendation',
+        estimated_minutes: op.estimated_minutes || 30,
+        priority: op.priority || 'medium',
+      })
       break
     }
     default:

@@ -644,3 +644,30 @@ SELECT
 FROM public.ai_runs
 GROUP BY feature
 ORDER BY total_requests DESC;
+
+-- =============================================================================
+-- SECTION 15: MOCK INTERVIEWS
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.mock_interviews (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id          UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  role_name           TEXT NOT NULL,
+  interview_type      TEXT NOT NULL DEFAULT 'technical',
+  difficulty          TEXT NOT NULL DEFAULT 'entry_level',
+  duration_seconds    INTEGER NOT NULL DEFAULT 0,
+  overall_score       INTEGER,
+  technical_score     INTEGER,
+  communication_score INTEGER,
+  confidence_score    INTEGER,
+  verdict             TEXT,
+  transcript_json     JSONB NOT NULL DEFAULT '[]',
+  evaluation_json     JSONB NOT NULL DEFAULT '{}',
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.mock_interviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Student owns mock_interviews" ON public.mock_interviews;
+CREATE POLICY "Student owns mock_interviews" ON public.mock_interviews
+  FOR ALL USING (student_id = auth.uid()) WITH CHECK (student_id = auth.uid());
+

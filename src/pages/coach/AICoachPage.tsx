@@ -8,7 +8,7 @@ import { useToast } from '../../components/ui/Toast'
 import { Button } from '../../components/ui/Button'
 import { LoadingPage } from '../../components/ui/Loading'
 import {
-  getOrCreateChat, loadMessages, saveMessage,
+  getOrCreateChat, createNewChat, loadMessages, saveMessage,
   sendToCoach, buildStudentContext,
   type ChatMessage, type ChatSession,
 } from '../../features/coach/coachService'
@@ -17,7 +17,7 @@ import {
   type PatchPreview, type PatchRecord,
 } from '../../features/coach/patchService'
 import type { ProposedPatch } from '../../config/aiFeatures'
-import { Send, BotMessageSquare, RotateCcw, CheckCircle, XCircle, History } from 'lucide-react'
+import { Send, BotMessageSquare, RotateCcw, CheckCircle, XCircle, History, Plus, AlertTriangle } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 export function AICoachPage() {
@@ -76,6 +76,29 @@ export function AICoachPage() {
     setLoading(false)
   }
 
+  async function handleNewChat() {
+    if (!appUser) return
+    setLoading(true)
+    try {
+      const newSession = await createNewChat(appUser.auth.id)
+      setChat(newSession)
+      setPendingPatch(null)
+      setPatchPreview(null)
+      const welcome: ChatMessage = {
+        id: `welcome-${Date.now()}`,
+        sender: 'assistant',
+        content: `Hello! Starting a new conversation. I can help you adjust your roadmap, schedule your daily tasks, review weaknesses, or answer placement questions.\n\nWhat would you like to work on?`,
+        created_at: new Date().toISOString(),
+      }
+      setMessages([welcome])
+      success('Started a fresh conversation.')
+    } catch {
+      toastError('Failed to create new chat session.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleSend() {
     if (!input.trim() || sending || !chat || !appUser) return
     const text = input.trim()
@@ -92,8 +115,8 @@ export function AICoachPage() {
       )
       setMessages(prev => [...prev, reply])
 
-      // If db_change — build preview
-      if (coachResponse.requires_confirmation && coachResponse.proposed_patch) {
+      // If proposed patch exists — build preview for user confirmation
+      if (coachResponse.proposed_patch && coachResponse.proposed_patch.operations?.length > 0) {
         setPendingPatch(coachResponse.proposed_patch)
         const preview = await buildPreview(appUser.auth.id, coachResponse.proposed_patch)
         setPatchPreview(preview)
@@ -116,7 +139,7 @@ export function AICoachPage() {
         const confirmMsg: ChatMessage = {
           id: `confirm-${Date.now()}`,
           sender: 'assistant',
-          content: `✅ Done! ${pendingPatch.summary}`,
+          content: `✅ Done! I have applied the requested changes: ${pendingPatch.summary}`,
           created_at: new Date().toISOString(),
         }
         setMessages(prev => [...prev, confirmMsg])
@@ -156,7 +179,16 @@ export function AICoachPage() {
           <BotMessageSquare size={20} color="var(--color-accent-500)" />
           <span className="coach-header__title">AI Coach</span>
         </div>
-        <div className="coach-header__actions">
+        <div className="coach-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            className="coach-history-btn"
+            onClick={handleNewChat}
+            style={{ color: 'var(--color-accent-700)', background: 'var(--color-accent-50)', borderColor: 'var(--color-accent-200)', cursor: 'pointer' }}
+            title="Start new chat"
+          >
+            <Plus size={14} />
+            <span>New Chat</span>
+          </button>
           <button className="coach-history-btn" onClick={handleLoadHistory} title="Change history">
             <History size={16} />
             <span>History</span>
@@ -285,24 +317,31 @@ function ConfirmationCard({
   onCancel: () => void
 }) {
   return (
-    <div className="confirm-card">
-      <div className="confirm-card__header">
-        <span className="confirm-card__title">Proposed Change</span>
-        <span className="confirm-card__summary">{preview.summary}</span>
+    <div className="confirm-card" style={{ border: '2px solid var(--color-accent-400)', boxShadow: '0 8px 24px -4px rgba(79, 70, 229, 0.15)' }}>
+      <div className="confirm-card__header" style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+        <AlertTriangle size={18} color="var(--color-warning-600)" style={{ flexShrink: 0, marginTop: '2px' }} />
+        <div>
+          <span className="confirm-card__title" style={{ display: 'block', color: 'var(--color-accent-800)', fontWeight: 700 }}>
+            Confirmation Required: Live Record Update
+          </span>
+          <span className="confirm-card__summary" style={{ display: 'block', marginTop: '2px', color: 'var(--text-secondary)' }}>
+            {preview.summary}
+          </span>
+        </div>
       </div>
 
       <div className="confirm-card__diff">
         <div className="confirm-card__col confirm-card__col--before">
-          <div className="confirm-card__col-label">Before</div>
+          <div className="confirm-card__col-label">Current State</div>
           {preview.before.map((item, i) => (
             <div key={i} className="confirm-card__row confirm-card__row--before">
               {renderPreviewItem(item)}
             </div>
           ))}
-          {preview.before.length === 0 && <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)' }}>—</span>}
+          {preview.before.length === 0 && <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)' }}>— None —</span>}
         </div>
         <div className="confirm-card__col confirm-card__col--after">
-          <div className="confirm-card__col-label">After</div>
+          <div className="confirm-card__col-label">Proposed State</div>
           {preview.after.map((item, i) => (
             <div key={i} className="confirm-card__row confirm-card__row--after">
               {renderPreviewItem(item)}
@@ -312,12 +351,16 @@ function ConfirmationCard({
         </div>
       </div>
 
+      <div style={{ padding: '0 var(--space-4)', fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+        Please confirm to apply these changes to your active roadmap or tasks.
+      </div>
+
       <div className="confirm-card__actions">
         <Button variant="secondary" size="sm" onClick={onCancel} disabled={loading}>
           <XCircle size={14} /> Cancel
         </Button>
-        <Button size="sm" onClick={onConfirm} loading={loading} id="confirm-patch-btn">
-          <CheckCircle size={14} /> Confirm Changes
+        <Button size="sm" onClick={onConfirm} loading={loading} id="confirm-patch-btn" style={{ background: 'var(--color-success-600)', borderColor: 'var(--color-success-600)' }}>
+          <CheckCircle size={14} /> Confirm & Apply Changes
         </Button>
       </div>
     </div>

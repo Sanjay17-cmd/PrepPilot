@@ -101,6 +101,20 @@ export async function getOrCreateChat(studentId: string): Promise<ChatSession> {
   return created as ChatSession
 }
 
+// ─── Explicitly start a fresh new chat session ───────────────────────────────
+export async function createNewChat(studentId: string): Promise<ChatSession> {
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: created, error } = await supabase
+    .from('ai_chats')
+    .insert({ student_id: studentId, title: `Chat — ${today} ${time}` })
+    .select('id, title, created_at, updated_at')
+    .single()
+
+  if (error) throw new Error('Failed to create new chat session')
+  return created as ChatSession
+}
+
 // ─── Load chat sessions list ──────────────────────────────────────────────────
 export async function loadChatSessions(studentId: string): Promise<ChatSession[]> {
   const { data } = await supabase

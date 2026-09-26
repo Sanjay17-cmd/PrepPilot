@@ -9,6 +9,7 @@ export type AllowedOperation =
   | 'reopen_task'
   | 'remove_task'
   | 'move_task'
+  | 'add_task'
   | 'create_daily_plan'
   | 'regenerate_daily_plan'
   | 'rename_roadmap'
@@ -23,6 +24,7 @@ export const ALLOWED_OPERATIONS = new Set<AllowedOperation>([
   'reopen_task',
   'remove_task',
   'move_task',
+  'add_task',
   'create_daily_plan',
   'regenerate_daily_plan',
   'rename_roadmap',
@@ -38,6 +40,7 @@ export const OPERATION_LABELS: Record<AllowedOperation, string> = {
   reopen_task:            'Reopen task',
   remove_task:            'Remove task',
   move_task:              'Move task to another day',
+  add_task:               'Add new task to daily plan',
   create_daily_plan:      'Create today\'s plan',
   regenerate_daily_plan:  'Regenerate today\'s plan',
   rename_roadmap:         'Rename roadmap',
@@ -54,6 +57,9 @@ export interface CoachOperation {
   operation: AllowedOperation
   task_title?: string
   task_id?: string
+  topic?: string
+  estimated_minutes?: number
+  priority?: 'high' | 'medium' | 'low'
   to_date?: string
   from_date?: string
   roadmap_id?: string

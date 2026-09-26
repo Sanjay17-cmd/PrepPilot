@@ -23,6 +23,8 @@ import { ProgressPage } from './pages/progress/ProgressPage'
 import { AICoachPage } from './pages/coach/AICoachPage'
 import { ResumePage } from './pages/resume/ResumePage'
 import { DSAPage } from './pages/dsa/DSAPage'
+import { MockInterviewPage } from './pages/interview/MockInterviewPage'
+import { InterviewRoomPage } from './pages/interview/InterviewRoomPage'
 
 export default function App() {
   return (
@@ -60,6 +62,10 @@ export default function App() {
               path="/assessment/result/:attemptId"
               element={<ProtectedRoute><AssessmentResultPage /></ProtectedRoute>}
             />
+            <Route
+              path="/interview/room"
+              element={<ProtectedRoute><InterviewRoomPage /></ProtectedRoute>}
+            />
 
             {/* ----------------------------------------------------------------
                 Student app — requires auth + onboarding completed
@@ -77,6 +83,7 @@ export default function App() {
               <Route path="/tasks"      element={<DailyPlanPage />} />
               <Route path="/daily"      element={<DailyPlanPage />} />
               <Route path="/dsa"        element={<DSAPage />} />
+              <Route path="/interview"  element={<MockInterviewPage />} />
               <Route path="/progress"   element={<ProgressPage />} />
               <Route path="/canvas"     element={<CanvasPage />} />
               <Route path="/coach"      element={<AICoachPage />} />
