@@ -127,7 +127,11 @@ export function EducationStep({ onNext }: EducationStepProps) {
     const [profileRes, eduRes] = await Promise.all([profileUpdate, educationUpsert])
 
     if (profileRes.error || eduRes.error) {
-      toastError('Could not save your information. Please try again.')
+      console.error('[EducationStep] profileRes.error:', profileRes.error)
+      console.error('[EducationStep] eduRes.error:', eduRes.error)
+      toastError(
+        eduRes.error?.message || profileRes.error?.message || 'Could not save your information. Please try again.'
+      )
       setSaving(false)
       return
     }
