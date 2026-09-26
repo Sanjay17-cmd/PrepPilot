@@ -42,6 +42,7 @@ export function AICoachPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const confirmCardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!appUser) return
@@ -51,6 +52,22 @@ export function AICoachPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Auto-scroll directly to confirmation card whenever a patch is proposed
+  useEffect(() => {
+    if (pendingPatch && patchPreview) {
+      const scrollToConfirm = () => {
+        if (confirmCardRef.current) {
+          confirmCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        } else {
+          bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        }
+      }
+      scrollToConfirm()
+      const timer = setTimeout(scrollToConfirm, 120)
+      return () => clearTimeout(timer)
+    }
+  }, [pendingPatch, patchPreview])
 
   async function init() {
     setLoading(true)
@@ -217,6 +234,7 @@ export function AICoachPage() {
           {/* ── Confirmation card ── */}
           {pendingPatch && patchPreview && (
             <ConfirmationCard
+              cardRef={confirmCardRef}
               preview={patchPreview}
               loading={confirmLoading}
               onConfirm={handleConfirm}
@@ -242,6 +260,64 @@ export function AICoachPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── Pinned Quick Confirmation Bar (Always visible without scrolling) ── */}
+        {pendingPatch && patchPreview && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 20px',
+              background: '#fffbeb',
+              borderTop: '2px solid #f59e0b',
+              borderBottom: '1px solid #fcd34d',
+              color: '#92400e',
+              fontSize: '13px',
+              gap: 'var(--space-3)',
+              flexShrink: 0,
+              boxShadow: '0 -2px 12px rgba(245, 158, 11, 0.15)',
+              zIndex: 8,
+              animation: 'fadeInUp 150ms ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+              <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0 }} />
+              <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <strong style={{ color: '#b45309' }}>Action Required:</strong>{' '}
+                <span style={{ color: '#78350f' }}>{patchPreview.summary}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setPendingPatch(null); setPatchPreview(null) }}
+                disabled={confirmLoading}
+                style={{ fontSize: '12px', padding: '4px 10px', color: '#92400e' }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirm}
+                loading={confirmLoading}
+                id="pinned-confirm-btn"
+                style={{
+                  fontSize: '12px',
+                  padding: '5px 14px',
+                  background: 'var(--color-success-600, #16a34a)',
+                  borderColor: 'var(--color-success-600, #16a34a)',
+                  color: '#fff',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)',
+                }}
+              >
+                <CheckCircle size={14} /> Confirm & Apply Changes
+              </Button>
+            </div>
           </div>
         )}
 
@@ -312,28 +388,49 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
 
 // ─── Confirmation Card ────────────────────────────────────────────────────────
 function ConfirmationCard({
-  preview, loading, onConfirm, onCancel,
+  preview, loading, onConfirm, onCancel, cardRef,
 }: {
   preview: PatchPreview
   loading: boolean
   onConfirm: () => void
   onCancel: () => void
+  cardRef?: React.RefObject<HTMLDivElement | null>
 }) {
   return (
-    <div className="confirm-card" style={{ border: '2px solid var(--color-accent-400)', boxShadow: '0 8px 24px -4px rgba(79, 70, 229, 0.15)' }}>
-      <div className="confirm-card__header" style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
-        <AlertTriangle size={18} color="var(--color-warning-600)" style={{ flexShrink: 0, marginTop: '2px' }} />
-        <div>
-          <span className="confirm-card__title" style={{ display: 'block', color: 'var(--color-accent-800)', fontWeight: 700 }}>
-            Confirmation Required: Live Record Update
-          </span>
-          <span className="confirm-card__summary" style={{ display: 'block', marginTop: '2px', color: 'var(--text-secondary)' }}>
-            {preview.summary}
-          </span>
+    <div
+      ref={cardRef}
+      className="confirm-card"
+      style={{
+        border: '2px solid var(--color-accent-400)',
+        boxShadow: '0 8px 24px -4px rgba(79, 70, 229, 0.15)',
+        scrollMarginBottom: '60px',
+      }}
+    >
+      <div className="confirm-card__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', minWidth: 0, flex: 1 }}>
+          <AlertTriangle size={18} color="var(--color-warning-600)" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <span className="confirm-card__title" style={{ display: 'block', color: 'var(--color-accent-800)', fontWeight: 700 }}>
+              Confirmation Required: Live Record Update
+            </span>
+            <span className="confirm-card__summary" style={{ display: 'block', marginTop: '2px', color: 'var(--text-secondary)' }}>
+              {preview.summary}
+            </span>
+          </div>
+        </div>
+
+        {/* Quick actions in card header */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+          <Button variant="ghost" size="sm" onClick={onCancel} disabled={loading} style={{ fontSize: '11px', padding: '3px 8px' }}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={onConfirm} loading={loading} style={{ fontSize: '11px', padding: '3px 10px', background: 'var(--color-success-600)', borderColor: 'var(--color-success-600)', color: '#fff' }}>
+            <CheckCircle size={12} /> Confirm
+          </Button>
         </div>
       </div>
 
-      <div className="confirm-card__diff">
+      <div className="confirm-card__diff" style={{ maxHeight: '190px', overflowY: 'auto' }}>
         <div className="confirm-card__col confirm-card__col--before">
           <div className="confirm-card__col-label">Current State</div>
           {preview.before.map((item, i) => (
@@ -354,11 +451,11 @@ function ConfirmationCard({
         </div>
       </div>
 
-      <div style={{ padding: '0 var(--space-4)', fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+      <div style={{ padding: '6px var(--space-4)', fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic', background: 'var(--bg-app)' }}>
         Please confirm to apply these changes to your active roadmap or tasks.
       </div>
 
-      <div className="confirm-card__actions">
+      <div className="confirm-card__actions" style={{ position: 'sticky', bottom: 0, background: 'var(--bg-surface)', borderTop: '1px solid var(--border-color)', zIndex: 2 }}>
         <Button variant="secondary" size="sm" onClick={onCancel} disabled={loading}>
           <XCircle size={14} /> Cancel
         </Button>
