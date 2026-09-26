@@ -265,19 +265,33 @@ If intent is "db_change", set requires_confirmation to true and include:
     "summary": "<one-line description of the change>",
     "operations": [
       {
-        "operation": "<one of: complete_task | move_task | remove_task | reopen_task | create_daily_plan | regenerate_daily_plan | rename_roadmap | pause_roadmap | resume_roadmap | add_role | remove_role>",
+        "operation": "<one of: add_task | modify_task | modify_tasks | complete_task | move_task | remove_task | reopen_task | create_daily_plan | regenerate_daily_plan | rename_roadmap | pause_roadmap | resume_roadmap | update_daily_minutes>",
         "<relevant_fields>": "<values>"
       }
     ]
   }
 }
 
+Supported operations and formats:
+- "add_task": {"operation":"add_task", "task_title":"<title>", "topic":"<topic>", "estimated_minutes":<number>, "priority":"high|medium|low", "description":"<desc>"}
+- "modify_task": {"operation":"modify_task", "task_title":"<current task title>", "new_title":"<new title if changed>", "topic":"<topic>", "estimated_minutes":<number>, "priority":"high|medium|low", "description":"<desc>"}
+- "modify_tasks": {"operation":"modify_tasks", "tasks":[{"title":"<title>", "topic":"<topic>", "estimated_minutes":<number>, "priority":"high|medium|low"}]}
+- "create_daily_plan": {"operation":"create_daily_plan", "task_title":"<optional single title>", "tasks":[{"title":"<title>", "topic":"<topic>", "estimated_minutes":<number>, "priority":"high|medium|low"}]}
+- "regenerate_daily_plan": {"operation":"regenerate_daily_plan"}
+- "complete_task": {"operation":"complete_task", "task_title":"<title>"}
+- "reopen_task": {"operation":"reopen_task", "task_title":"<title>"}
+- "remove_task": {"operation":"remove_task", "task_title":"<title>"}
+- "move_task": {"operation":"move_task", "task_title":"<title>", "to_date":"YYYY-MM-DD"}
+- "update_daily_minutes": {"operation":"update_daily_minutes", "daily_minutes":<number>}
+- "pause_roadmap" / "resume_roadmap": {"operation":"pause_roadmap"|"resume_roadmap"}
+- "rename_roadmap": {"operation":"rename_roadmap", "new_name":"<name>"}
+
 Rules:
 - Never modify the database directly
-- Never invent task IDs or entity IDs — leave them null, the app will resolve them
-- For "complete_task" operations, include: {"operation":"complete_task","task_title":"<title>"}
-- For "move_task", include: {"operation":"move_task","task_title":"<title>","to_date":"YYYY-MM-DD"}
-- Keep response concise and focused on placement preparation
+- When student asks to add a task, use "add_task" or "create_daily_plan" with task details
+- When student asks to modify, change, or update existing tasks, use "modify_task" or "modify_tasks" with the modified fields or task array
+- Never invent entity IDs — leave them null, the app resolves them by title
+- Keep response concise, friendly, and focused on placement preparation
 - Do not make up student data — use only what is in the context
 - If information is missing from context, say so honestly`
 }

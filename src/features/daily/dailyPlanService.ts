@@ -252,6 +252,124 @@ export async function addCustomTask(
 }
 
 // -------------------------------------------------------------------------
+// Add multiple tasks at once
+// -------------------------------------------------------------------------
+export async function addMultipleTasks(
+  dailyPlanId: string,
+  studentId: string,
+  tasksList: Array<{
+    title: string
+    topic?: string
+    description?: string
+    estimated_minutes?: number
+    priority?: 'high' | 'medium' | 'low'
+    status?: Task['status']
+  }>,
+): Promise<Task[]> {
+  if (!tasksList.length) return []
+
+  const rows = tasksList.map((t, idx) => ({
+    daily_plan_id:     dailyPlanId,
+    student_id:        studentId,
+    topic:             t.topic?.trim() || 'General Task',
+    title:             t.title.trim(),
+    description:       t.description?.trim() || null,
+    estimated_minutes: t.estimated_minutes || 30,
+    priority:          (['high', 'medium', 'low'].includes(t.priority as string) ? t.priority : 'medium') as Task['priority'],
+    status:            (t.status || 'pending') as Task['status'],
+    display_order:     idx + 1,
+  }))
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(rows)
+    .select('id, topic, title, description, estimated_minutes, priority, status, display_order')
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Task[]
+}
+
+// -------------------------------------------------------------------------
+// Update task details (title, topic, minutes, priority, description, status)
+// -------------------------------------------------------------------------
+export async function updateTask(
+  taskId: string,
+  updates: {
+    title?: string
+    topic?: string
+    description?: string | null
+    estimated_minutes?: number | null
+    priority?: 'high' | 'medium' | 'low'
+    status?: Task['status']
+  },
+): Promise<Task> {
+  const payload: Record<string, unknown> = {}
+  if (updates.title !== undefined) payload.title = updates.title.trim()
+  if (updates.topic !== undefined) payload.topic = updates.topic.trim()
+  if (updates.description !== undefined) payload.description = updates.description?.trim() || null
+  if (updates.estimated_minutes !== undefined) payload.estimated_minutes = updates.estimated_minutes
+  if (updates.priority !== undefined) payload.priority = updates.priority
+  if (updates.status !== undefined) payload.status = updates.status
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(payload)
+    .eq('id', taskId)
+    .select('id, topic, title, description, estimated_minutes, priority, status, display_order')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data as Task
+}
+
+// -------------------------------------------------------------------------
+// Replace daily plan tasks with a new list (e.g. from JSON or AI modification)
+// -------------------------------------------------------------------------
+export async function replaceDailyPlanTasks(
+  dailyPlanId: string,
+  studentId: string,
+  newTasks: Array<{
+    id?: string
+    title: string
+    topic?: string
+    description?: string
+    estimated_minutes?: number
+    priority?: 'high' | 'medium' | 'low'
+    status?: Task['status']
+  }>,
+): Promise<Task[]> {
+  // Delete existing uncompleted tasks (preserve already completed ones if any, or clear pending)
+  await supabase
+    .from('tasks')
+    .delete()
+    .eq('daily_plan_id', dailyPlanId)
+    .neq('status', 'completed')
+
+  if (newTasks.length === 0) return []
+
+  const rows = newTasks.map((t, idx) => ({
+    daily_plan_id:     dailyPlanId,
+    student_id:        studentId,
+    topic:             t.topic?.trim() || 'General Task',
+    title:             t.title.trim(),
+    description:       t.description?.trim() || null,
+    estimated_minutes: t.estimated_minutes || 30,
+    priority:          (['high', 'medium', 'low'].includes(t.priority as string) ? t.priority : 'medium') as Task['priority'],
+    status:            (t.status || 'pending') as Task['status'],
+    display_order:     idx + 1,
+  }))
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(rows)
+    .select('id, topic, title, description, estimated_minutes, priority, status, display_order')
+    .order('display_order')
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Task[]
+}
+
+// -------------------------------------------------------------------------
 // Delete task
 // -------------------------------------------------------------------------
 export async function deleteTask(taskId: string): Promise<void> {

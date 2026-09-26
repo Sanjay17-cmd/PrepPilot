@@ -1,7 +1,8 @@
 /**
  * Tasks / Daily Plan Page (P2-12)
  * Full task management hub: loads today's plan, generates AI roadmap tasks,
- * supports adding custom tasks, filtering, completion tracking, and deletion.
+ * supports adding custom tasks, filtering, editing tasks, JSON tasks bulk editor,
+ * completion tracking, and deletion.
  */
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
@@ -16,6 +17,8 @@ import {
   generateDailyPlan,
   updateTaskStatus,
   addCustomTask,
+  updateTask,
+  replaceDailyPlanTasks,
   deleteTask,
   ensureTodayPlan,
   type DailyPlan,
@@ -34,6 +37,10 @@ import {
   Plus,
   Trash2,
   ListTodo,
+  Edit2,
+  Code2,
+  Copy,
+  Check,
 } from 'lucide-react'
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -61,6 +68,7 @@ export function DailyPlanPage() {
   const [showAddTaskModal, setShowAddTaskModal] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all')
 
+  // Create Task Form State
   const [taskForm, setTaskForm] = useState<{
     title: string
     topic: string
@@ -74,6 +82,30 @@ export function DailyPlanPage() {
     estimated_minutes: 30,
     priority: 'medium',
   })
+
+  // Edit Task State
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editTaskForm, setEditTaskForm] = useState<{
+    title: string
+    topic: string
+    description: string
+    estimated_minutes: number
+    priority: 'high' | 'medium' | 'low'
+  }>({
+    title: '',
+    topic: 'DSA & Core',
+    description: '',
+    estimated_minutes: 30,
+    priority: 'medium',
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // JSON Tasks Editor State
+  const [showJsonModal, setShowJsonModal] = useState(false)
+  const [tasksJsonText, setTasksJsonText] = useState('')
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const [savingJson, setSavingJson] = useState(false)
+  const [copiedJson, setCopiedJson] = useState(false)
 
   const studentRoles = appUser?.studentRoles ?? []
   const primaryRole = studentRoles.find(r => r.is_primary) ?? studentRoles[0]
@@ -207,6 +239,120 @@ export function DailyPlanPage() {
     }
   }
 
+  // Open Edit Task Modal
+  function handleOpenEditTask(task: Task) {
+    setEditingTask(task)
+    setEditTaskForm({
+      title: task.title,
+      topic: task.topic || 'DSA & Core',
+      description: task.description || '',
+      estimated_minutes: task.estimated_minutes || 30,
+      priority: task.priority || 'medium',
+    })
+  }
+
+  // Save Edited Task
+  async function handleSaveEditedTask() {
+    if (!editingTask || !editTaskForm.title.trim()) return
+    setSavingEdit(true)
+    try {
+      const updated = await updateTask(editingTask.id, {
+        title: editTaskForm.title.trim(),
+        topic: editTaskForm.topic.trim(),
+        description: editTaskForm.description.trim() || null,
+        estimated_minutes: Number(editTaskForm.estimated_minutes) || 30,
+        priority: editTaskForm.priority,
+      })
+
+      setPlan(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t.id === editingTask.id ? { ...t, ...updated } : t),
+        }
+      })
+      setEditingTask(null)
+      success('Task updated!')
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to update task.')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // Open JSON Tasks Modal
+  function handleOpenJsonModal() {
+    const tasksToFormat = plan?.tasks.map(t => ({
+      title: t.title,
+      topic: t.topic,
+      estimated_minutes: t.estimated_minutes ?? 30,
+      priority: t.priority ?? 'medium',
+      description: t.description ?? '',
+      status: t.status ?? 'pending',
+    })) ?? []
+
+    setTasksJsonText(JSON.stringify(tasksToFormat, null, 2))
+    setJsonError(null)
+    setShowJsonModal(true)
+  }
+
+  // Copy JSON to clipboard
+  function handleCopyJson() {
+    navigator.clipboard.writeText(tasksJsonText)
+    setCopiedJson(true)
+    setTimeout(() => setCopiedJson(false), 2000)
+  }
+
+  // Format JSON indentation
+  function handleFormatJson() {
+    try {
+      const parsed = JSON.parse(tasksJsonText)
+      setTasksJsonText(JSON.stringify(parsed, null, 2))
+      setJsonError(null)
+    } catch (err: any) {
+      setJsonError(`Cannot format: ${err.message}`)
+    }
+  }
+
+  // Save modified JSON of tasks
+  async function handleSaveTasksJson() {
+    if (!appUser) return
+    setJsonError(null)
+    let parsed: any[]
+    try {
+      parsed = JSON.parse(tasksJsonText)
+      if (!Array.isArray(parsed)) {
+        setJsonError('JSON must be an array of task objects: [{ "title": "...", "topic": "..." }]')
+        return
+      }
+      for (let i = 0; i < parsed.length; i++) {
+        if (!parsed[i] || typeof parsed[i] !== 'object' || !parsed[i].title) {
+          setJsonError(`Task at index ${i} must have a valid "title" string.`)
+          return
+        }
+      }
+    } catch (err: any) {
+      setJsonError(`Invalid JSON format: ${err.message}`)
+      return
+    }
+
+    setSavingJson(true)
+    try {
+      const currentPlan = await ensureTodayPlan(appUser.auth.id, activeRoadmapId || undefined)
+      const updatedTasks = await replaceDailyPlanTasks(currentPlan.id, appUser.auth.id, parsed)
+      setPlan({
+        ...currentPlan,
+        tasks: updatedTasks,
+      })
+      setShowJsonModal(false)
+      success(`Saved ${updatedTasks.length} tasks from JSON!`)
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to save tasks from JSON.')
+    } finally {
+      setSavingJson(false)
+    }
+  }
+
   if (loading) return <LoadingPage />
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -219,9 +365,14 @@ export function DailyPlanPage() {
             <h1 className="page-header__title">Tasks</h1>
             <p className="page-header__subtitle">{today}</p>
           </div>
-          <Button onClick={() => setShowAddTaskModal(true)} id="add-custom-task-btn">
-            <Plus size={15} /> Add Task
-          </Button>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <Button variant="secondary" onClick={handleOpenJsonModal}>
+              <Code2 size={15} /> Tasks JSON
+            </Button>
+            <Button onClick={() => setShowAddTaskModal(true)} id="add-custom-task-btn">
+              <Plus size={15} /> Add Task
+            </Button>
+          </div>
         </div>
         <EmptyState
           icon={<CalendarDays size={40} />}
@@ -238,6 +389,8 @@ export function DailyPlanPage() {
         />
 
         {renderAddTaskModal()}
+        {renderEditTaskModal()}
+        {renderJsonTasksModal()}
       </div>
     )
   }
@@ -250,9 +403,14 @@ export function DailyPlanPage() {
             <h1 className="page-header__title">Tasks</h1>
             <p className="page-header__subtitle">{today}</p>
           </div>
-          <Button onClick={() => setShowAddTaskModal(true)} id="add-custom-task-btn">
-            <Plus size={15} /> Add Task
-          </Button>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <Button variant="secondary" onClick={handleOpenJsonModal}>
+              <Code2 size={15} /> Tasks JSON
+            </Button>
+            <Button onClick={() => setShowAddTaskModal(true)} id="add-custom-task-btn">
+              <Plus size={15} /> Add Task
+            </Button>
+          </div>
         </div>
         <EmptyState
           icon={<ListTodo size={40} />}
@@ -272,6 +430,8 @@ export function DailyPlanPage() {
         />
 
         {renderAddTaskModal()}
+        {renderEditTaskModal()}
+        {renderJsonTasksModal()}
       </div>
     )
   }
@@ -286,6 +446,7 @@ export function DailyPlanPage() {
   const completionPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
   const totalMinutes = allTasks.reduce((s, t) => s + (t.estimated_minutes ?? 0), 0)
 
+  // ── Modal: Add Custom Task ──────────────────────────────────────────────────
   function renderAddTaskModal() {
     return (
       <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title="Add Custom Task">
@@ -357,6 +518,136 @@ export function DailyPlanPage() {
     )
   }
 
+  // ── Modal: Edit Existing Task ───────────────────────────────────────────────
+  function renderEditTaskModal() {
+    return (
+      <Modal open={!!editingTask} onClose={() => setEditingTask(null)} title="Edit Task Details">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div>
+            <label className="form-label">Task Title *</label>
+            <input
+              className="form-input"
+              value={editTaskForm.title}
+              onChange={e => setEditTaskForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="Task title"
+              id="edit-task-title"
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <div>
+              <label className="form-label">Category / Topic</label>
+              <input
+                className="form-input"
+                value={editTaskForm.topic}
+                onChange={e => setEditTaskForm(f => ({ ...f, topic: e.target.value }))}
+                placeholder="e.g. DSA, DBMS, System Design"
+              />
+            </div>
+            <div>
+              <label className="form-label">Estimated Minutes</label>
+              <input
+                type="number"
+                className="form-input"
+                value={editTaskForm.estimated_minutes}
+                onChange={e => setEditTaskForm(f => ({ ...f, estimated_minutes: Number(e.target.value) || 15 }))}
+                min={5}
+                max={240}
+                step={5}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="form-label">Priority</label>
+            <select
+              className="form-select"
+              value={editTaskForm.priority}
+              onChange={e => setEditTaskForm(f => ({ ...f, priority: e.target.value as 'high' | 'medium' | 'low' }))}
+            >
+              <option value="high">High Priority</option>
+              <option value="medium">Medium Priority</option>
+              <option value="low">Low Priority</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Description / Objectives (Optional)</label>
+            <textarea
+              className="form-input"
+              rows={3}
+              value={editTaskForm.description}
+              onChange={e => setEditTaskForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Key notes, links, or what success looks like..."
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setEditingTask(null)}>Cancel</Button>
+            <Button onClick={handleSaveEditedTask} loading={savingEdit} disabled={!editTaskForm.title.trim()}>
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
+
+  // ── Modal: Edit Tasks JSON ──────────────────────────────────────────────────
+  function renderJsonTasksModal() {
+    return (
+      <Modal open={showJsonModal} onClose={() => setShowJsonModal(false)} title="Daily Tasks JSON Editor">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
+            Inspect or directly edit the JSON of today's tasks. You can add new tasks, edit fields, change durations, or reorder tasks.
+          </p>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Format: Array of task objects with <code>title</code>, <code>topic</code>, <code>estimated_minutes</code>, <code>priority</code></span>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <Button size="sm" variant="ghost" onClick={handleFormatJson} style={{ fontSize: '11px', padding: '2px 8px' }}>
+                Format JSON
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCopyJson} style={{ fontSize: '11px', padding: '2px 8px' }}>
+                {copiedJson ? <Check size={12} color="var(--color-success-600)" /> : <Copy size={12} />}
+                {copiedJson ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+          </div>
+
+          <textarea
+            className="form-input"
+            value={tasksJsonText}
+            onChange={e => { setTasksJsonText(e.target.value); setJsonError(null) }}
+            rows={14}
+            style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontSize: '12px',
+              lineHeight: 1.5,
+              whiteSpace: 'pre',
+              tabSize: 2,
+              background: 'var(--color-gray-900, #111827)',
+              color: '#f3f4f6',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-3)',
+            }}
+          />
+
+          {jsonError && (
+            <div style={{ padding: '8px 12px', background: 'var(--color-danger-50)', color: 'var(--color-danger-700)', borderRadius: 'var(--radius-sm)', fontSize: '12px', border: '1px solid var(--color-danger-200)' }}>
+              {jsonError}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
+            <Button variant="secondary" onClick={() => setShowJsonModal(false)}>Cancel</Button>
+            <Button onClick={handleSaveTasksJson} loading={savingJson} style={{ background: 'var(--color-accent-600)' }}>
+              Save & Apply JSON
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
     <div className="page-container">
       {/* Header */}
@@ -366,6 +657,9 @@ export function DailyPlanPage() {
           <p className="page-header__subtitle">{today}</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <Button variant="secondary" size="sm" onClick={handleOpenJsonModal} title="View and modify tasks in JSON format">
+            <Code2 size={13} /> Tasks JSON
+          </Button>
           <Button variant="primary" size="sm" onClick={() => setShowAddTaskModal(true)}>
             <Plus size={13} /> Add Task
           </Button>
@@ -455,6 +749,7 @@ export function DailyPlanPage() {
                     key={task.id}
                     task={task}
                     onStatus={handleTaskStatus}
+                    onEdit={handleOpenEditTask}
                     onDelete={handleDeleteTask}
                     priorityColor={PRIORITY_COLORS[priority]}
                     priorityBg={PRIORITY_BG[priority]}
@@ -477,6 +772,8 @@ export function DailyPlanPage() {
       )}
 
       {renderAddTaskModal()}
+      {renderEditTaskModal()}
+      {renderJsonTasksModal()}
     </div>
   )
 }
@@ -485,12 +782,14 @@ export function DailyPlanPage() {
 function TaskCard({
   task,
   onStatus,
+  onEdit,
   onDelete,
   priorityColor,
   priorityBg: _priorityBg,
 }: {
   task: Task
   onStatus: (id: string, status: Task['status']) => void
+  onEdit: (task: Task) => void
   onDelete: (id: string) => void
   priorityColor: string
   priorityBg: string
@@ -542,7 +841,7 @@ function TaskCard({
           </div>
         </div>
 
-        {/* Start / delete actions */}
+        {/* Start / Complete / Edit / Delete actions */}
         <div className="task-card__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {!isCompleted && !isInProgress && (
             <Button
@@ -564,6 +863,22 @@ function TaskCard({
               Complete
             </Button>
           )}
+          <button
+            onClick={() => onEdit(task)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-tertiary)',
+              cursor: 'pointer',
+              padding: '4px',
+              borderRadius: 'var(--radius-sm)',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Edit task details"
+          >
+            <Edit2 size={13} />
+          </button>
           <button
             onClick={() => onDelete(task.id)}
             style={{

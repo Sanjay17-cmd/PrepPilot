@@ -40,7 +40,7 @@ export async function buildStudentContext(studentId: string): Promise<Record<str
   if (planRes.data?.id) {
     const { data: tasks } = await supabase
       .from('tasks')
-      .select('title, topic, status, priority, estimated_minutes')
+      .select('id, title, topic, status, priority, estimated_minutes, description')
       .eq('daily_plan_id', planRes.data.id)
       .order('display_order')
     todayTasks = tasks ?? []

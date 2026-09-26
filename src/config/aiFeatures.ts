@@ -10,6 +10,9 @@ export type AllowedOperation =
   | 'remove_task'
   | 'move_task'
   | 'add_task'
+  | 'modify_task'
+  | 'update_task'
+  | 'modify_tasks'
   | 'create_daily_plan'
   | 'regenerate_daily_plan'
   | 'rename_roadmap'
@@ -25,6 +28,9 @@ export const ALLOWED_OPERATIONS = new Set<AllowedOperation>([
   'remove_task',
   'move_task',
   'add_task',
+  'modify_task',
+  'update_task',
+  'modify_tasks',
   'create_daily_plan',
   'regenerate_daily_plan',
   'rename_roadmap',
@@ -41,6 +47,9 @@ export const OPERATION_LABELS: Record<AllowedOperation, string> = {
   remove_task:            'Remove task',
   move_task:              'Move task to another day',
   add_task:               'Add new task to daily plan',
+  modify_task:            'Modify existing task',
+  update_task:            'Update task details',
+  modify_tasks:           'Update daily tasks JSON',
   create_daily_plan:      'Create today\'s plan',
   regenerate_daily_plan:  'Regenerate today\'s plan',
   rename_roadmap:         'Rename roadmap',
@@ -53,19 +62,39 @@ export const OPERATION_LABELS: Record<AllowedOperation, string> = {
 
 export type CoachIntent = 'info' | 'explanation' | 'planning' | 'db_change'
 
+export interface CoachTaskItem {
+  id?: string
+  title: string
+  topic?: string
+  description?: string
+  estimated_minutes?: number
+  priority?: 'high' | 'medium' | 'low'
+  status?: 'pending' | 'in_progress' | 'completed' | 'skipped'
+}
+
 export interface CoachOperation {
   operation: AllowedOperation
   task_title?: string
   task_id?: string
+  new_title?: string
+  title?: string
   topic?: string
+  new_topic?: string
+  description?: string
+  new_description?: string
   estimated_minutes?: number
+  new_estimated_minutes?: number
   priority?: 'high' | 'medium' | 'low'
+  new_priority?: 'high' | 'medium' | 'low'
+  status?: 'pending' | 'in_progress' | 'completed' | 'skipped'
   to_date?: string
   from_date?: string
   roadmap_id?: string
   new_name?: string
   role_id?: string
   daily_minutes?: number
+  tasks?: CoachTaskItem[]
+  plan_json?: Record<string, unknown>
 }
 
 export interface ProposedPatch {

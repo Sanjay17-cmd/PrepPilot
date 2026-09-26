@@ -180,7 +180,13 @@ export function useInterviewSpeech() {
       }
 
       if (recognitionRef.current) {
-        recognitionRef.current.start()
+        try {
+          recognitionRef.current.start()
+        } catch (e: any) {
+          if (e.name !== 'InvalidStateError') {
+            console.warn('[SpeechRecognition] start error:', e)
+          }
+        }
       } else {
         setIsListening(true)
       }

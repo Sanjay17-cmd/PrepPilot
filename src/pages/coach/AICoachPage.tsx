@@ -143,6 +143,9 @@ export function AICoachPage() {
           created_at: new Date().toISOString(),
         }
         setMessages(prev => [...prev, confirmMsg])
+        // Refresh context so coach immediately reflects updated tasks
+        const updatedCtx = await buildStudentContext(appUser.auth.id)
+        setStudentCtx(updatedCtx)
       } else {
         toastError(result.error ?? 'Failed to apply changes.')
       }
@@ -371,6 +374,42 @@ function renderPreviewItem(item: Record<string, unknown>): React.ReactNode {
   const type = item.type as string
   if (type === 'task' || type === 'task_move') {
     return <span style={{ fontSize: 'var(--text-sm)' }}>{String(item.title ?? '')} — <em>{String(item.status ?? item.from ?? item.to ?? '')}</em></span>
+  }
+  if (type === 'task_modify') {
+    return (
+      <span style={{ fontSize: 'var(--text-sm)' }}>
+        <strong>{String(item.title ?? '')}</strong>{' '}
+        <span style={{ opacity: 0.8, fontSize: '11px' }}>
+          ({String(item.minutes ?? 30)}m, {String(item.priority ?? 'medium')})
+        </span>
+        {item.topic ? <em style={{ marginLeft: '4px', fontSize: '11px', opacity: 0.7 }}>[{String(item.topic)}]</em> : null}
+      </span>
+    )
+  }
+  if (type === 'daily_plan') {
+    return (
+      <span style={{ fontSize: 'var(--text-sm)' }}>
+        <strong>{String(item.title ?? 'Daily Plan')}</strong>: {String(item.note ?? '')}
+      </span>
+    )
+  }
+  if (type === 'tasks_json') {
+    const items = item.items as string[] | undefined
+    return (
+      <div style={{ fontSize: 'var(--text-xs)' }}>
+        <span style={{ fontWeight: 600 }}>{String(item.note ?? 'Tasks JSON')}</span>
+        {items && items.length > 0 && (
+          <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+            {items.map((it, idx) => (
+              <li key={idx}>{it}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+  if (type === 'study_time') {
+    return <span style={{ fontSize: 'var(--text-sm)' }}>Study Target: {String(item.minutes ?? '')}</span>
   }
   if (type === 'roadmap') {
     return <span style={{ fontSize: 'var(--text-sm)' }}>{String(item.name ?? '')} → <em>{String(item.status ?? '')}</em></span>
