@@ -57,7 +57,7 @@ export async function buildStudentContext(studentId: string): Promise<Record<str
   if (roadmap?.id) {
     const { data: phases } = await supabase
       .from('roadmap_phases')
-      .select('title, status, display_order')
+      .select('id, title, status, display_order, roadmap_phase_topics(id, topic, status, priority, estimated_minutes)')
       .eq('roadmap_id', roadmap.id)
       .in('status', ['not_started', 'in_progress'])
       .order('display_order')

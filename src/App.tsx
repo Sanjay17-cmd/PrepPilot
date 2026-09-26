@@ -25,6 +25,7 @@ import { ResumePage } from './pages/resume/ResumePage'
 import { DSAPage } from './pages/dsa/DSAPage'
 import { MockInterviewPage } from './pages/interview/MockInterviewPage'
 import { InterviewRoomPage } from './pages/interview/InterviewRoomPage'
+import { LeetCodePage } from './pages/leetcode/LeetCodePage'
 
 export default function App() {
   return (
@@ -88,6 +89,7 @@ export default function App() {
               <Route path="/canvas"     element={<CanvasPage />} />
               <Route path="/coach"      element={<AICoachPage />} />
               <Route path="/resume"     element={<ResumePage />} />
+              <Route path="/leetcode"   element={<LeetCodePage />} />
               <Route path="/settings"   element={<SettingsPage />} />
             </Route>
 

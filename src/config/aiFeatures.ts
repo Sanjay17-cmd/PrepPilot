@@ -19,8 +19,8 @@ export type AllowedOperation =
   | 'pause_roadmap'
   | 'resume_roadmap'
   | 'add_role'
-  | 'remove_role'
   | 'update_daily_minutes'
+  | 'update_roadmap_topic'
 
 export const ALLOWED_OPERATIONS = new Set<AllowedOperation>([
   'complete_task',
@@ -39,6 +39,7 @@ export const ALLOWED_OPERATIONS = new Set<AllowedOperation>([
   'add_role',
   'remove_role',
   'update_daily_minutes',
+  'update_roadmap_topic',
 ])
 
 export const OPERATION_LABELS: Record<AllowedOperation, string> = {
@@ -58,6 +59,7 @@ export const OPERATION_LABELS: Record<AllowedOperation, string> = {
   add_role:               'Add preparation role',
   remove_role:            'Remove preparation role',
   update_daily_minutes:   'Update daily study time',
+  update_roadmap_topic:   'Update roadmap topic',
 }
 
 export type CoachIntent = 'info' | 'explanation' | 'planning' | 'db_change'
@@ -95,6 +97,9 @@ export interface CoachOperation {
   daily_minutes?: number
   tasks?: CoachTaskItem[]
   plan_json?: Record<string, unknown>
+  topic_id?: string
+  topic_name?: string
+  phase_id?: string
 }
 
 export interface ProposedPatch {

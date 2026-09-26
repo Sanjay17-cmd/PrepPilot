@@ -104,6 +104,7 @@ export async function generateRoadmapViaAI(
   roleSlug: string,
   skills: SkillRow[],
   dailyMinutes: number,
+  targetDays?: number
 ): Promise<{ phases: RoadmapPhase[]; aiRunId: string }> {
   const { data: raw, error: fnErr } = await supabase.functions.invoke('ai-gateway', {
     body: {
@@ -114,6 +115,7 @@ export async function generateRoadmapViaAI(
         role_slug:     roleSlug,
         skills,
         daily_minutes: dailyMinutes,
+        target_days:   targetDays || 60,
         weak_topics:   skills.filter(s => s.score < 50).map(s => s.topic),
         strong_topics: skills.filter(s => s.score >= 70).map(s => s.topic),
       },

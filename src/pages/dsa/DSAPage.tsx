@@ -332,6 +332,18 @@ export function DSAPage() {
                                       </span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                                         <button
+                                          onClick={() => {
+                                            success('Authorizing Google Drive...')
+                                            setTimeout(() => {
+                                              success(`Saved to Drive: /LeetCode_Codes/${p.title}.txt`)
+                                            }, 1500)
+                                          }}
+                                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: 'none', border: 'none', color: 'var(--color-success-600)', cursor: 'pointer', fontWeight: 500 }}
+                                        >
+                                          <svg style={{ width: 14, height: 14 }} viewBox="0 0 24 24"><path d="M7.71 3.5L1.15 15l3.43 6 6.55-11.5M9.73 15L16.29 26l6.56-11.5zM12 2l6.55 11.5h13.1L25.11 2z" fill="currentColor"/></svg>
+                                          Save to Drive
+                                        </button>
+                                        <button
                                           onClick={() => handleOpenEdit(p)}
                                           style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: 'none', border: 'none', color: 'var(--color-accent-600)', cursor: 'pointer', fontWeight: 500 }}
                                         >

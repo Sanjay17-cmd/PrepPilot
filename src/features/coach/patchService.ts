@@ -223,6 +223,12 @@ export async function buildPreview(
       before.push({ type: 'study_time', minutes: 'Current daily target' })
       after.push({ type: 'study_time', minutes: `${op.daily_minutes ?? 60} minutes/day` })
     }
+
+    // Update roadmap topic
+    if (op.operation === 'update_roadmap_topic') {
+      before.push({ type: 'roadmap_topic', name: op.topic_name || 'Roadmap Topic', status: 'current' })
+      after.push({ type: 'roadmap_topic', name: op.topic_name || 'Roadmap Topic', status: op.status || 'updated' })
+    }
   }
 
   return {
@@ -472,6 +478,24 @@ async function executeOperation(studentId: string, op: CoachOperation): Promise<
           .from('profiles')
           .update({ daily_minutes: op.daily_minutes })
           .eq('id', studentId)
+      }
+      break
+    }
+
+    case 'update_roadmap_topic': {
+      if (op.topic_id) {
+        const updateData: any = {}
+        if (op.status) updateData.status = op.status
+        if (op.topic_name) updateData.topic = op.topic_name
+        if (op.priority) updateData.priority = op.priority
+        if (op.estimated_minutes) updateData.estimated_minutes = op.estimated_minutes
+
+        if (Object.keys(updateData).length > 0) {
+          await supabase
+            .from('roadmap_phase_topics')
+            .update(updateData)
+            .eq('id', op.topic_id)
+        }
       }
       break
     }

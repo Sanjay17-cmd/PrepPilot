@@ -265,7 +265,7 @@ If intent is "db_change", set requires_confirmation to true and include:
     "summary": "<one-line description of the change>",
     "operations": [
       {
-        "operation": "<one of: add_task | modify_task | modify_tasks | complete_task | move_task | remove_task | reopen_task | create_daily_plan | regenerate_daily_plan | rename_roadmap | pause_roadmap | resume_roadmap | update_daily_minutes>",
+        "operation": "<one of: add_task | modify_task | modify_tasks | complete_task | move_task | remove_task | reopen_task | create_daily_plan | regenerate_daily_plan | rename_roadmap | pause_roadmap | resume_roadmap | update_daily_minutes | update_roadmap_topic>",
         "<relevant_fields>": "<values>"
       }
     ]
@@ -285,6 +285,7 @@ Supported operations and formats:
 - "update_daily_minutes": {"operation":"update_daily_minutes", "daily_minutes":<number>}
 - "pause_roadmap" / "resume_roadmap": {"operation":"pause_roadmap"|"resume_roadmap"}
 - "rename_roadmap": {"operation":"rename_roadmap", "new_name":"<name>"}
+- "update_roadmap_topic": {"operation":"update_roadmap_topic", "topic_id":"<id>", "topic_name":"<new_name>", "status":"completed|in_progress|not_started", "priority":"high|medium|low", "estimated_minutes":<number>}
 
 Rules:
 - Never modify the database directly

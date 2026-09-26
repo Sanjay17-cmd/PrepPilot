@@ -47,6 +47,7 @@ export function RoadmapPage() {
   const [generating, setGenerating] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [dailyMinutes, setDailyMinutes] = useState(60)
+  const [targetDays, setTargetDays] = useState(60)
 
   const studentRoles = appUser?.studentRoles ?? []
   const primaryRole = studentRoles.find(r => r.is_primary) ?? studentRoles[0]
@@ -92,6 +93,7 @@ export function RoadmapPage() {
         primaryRole!.role!.slug,
         skills,
         dailyMinutes,
+        targetDays
       )
       const roadmapId = await saveRoadmap(
         appUser!.auth.id,
@@ -143,10 +145,26 @@ export function RoadmapPage() {
           }
           action={
             primaryRole?.role ? (
-              <Button onClick={handleGenerate} loading={generating} id="generate-roadmap-btn">
-                <Zap size={15} />
-                Generate Roadmap
-              </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <div style={{ textAlign: 'left' }}>
+                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>Daily study time</label>
+                    <select value={dailyMinutes} onChange={e => setDailyMinutes(Number(e.target.value))} className="form-select" style={{ minWidth: '150px' }}>
+                      {[30, 60, 90, 120].map(m => <option key={m} value={m}>{m} minutes / day</option>)}
+                    </select>
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>Target days</label>
+                    <select value={targetDays} onChange={e => setTargetDays(Number(e.target.value))} className="form-select" style={{ minWidth: '150px' }}>
+                      {[15, 30, 45, 60, 90, 120].map(d => <option key={d} value={d}>{d} days</option>)}
+                    </select>
+                  </div>
+                </div>
+                <Button onClick={handleGenerate} loading={generating} id="generate-roadmap-btn">
+                  <Zap size={15} />
+                  Generate Roadmap
+                </Button>
+              </div>
             ) : (
               <Link to="/assessment"><Button>Take Assessment First</Button></Link>
             )
@@ -385,6 +403,20 @@ export function RoadmapPage() {
             >
               {[30, 60, 90, 120].map(m => (
                 <option key={m} value={m}>{m} minutes / day</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, marginBottom: 'var(--space-2)', display: 'block' }}>
+              Target preparation days
+            </label>
+            <select
+              value={targetDays}
+              onChange={e => setTargetDays(Number(e.target.value))}
+              className="form-select"
+            >
+              {[15, 30, 45, 60, 90, 120].map(d => (
+                <option key={d} value={d}>{d} days</option>
               ))}
             </select>
           </div>

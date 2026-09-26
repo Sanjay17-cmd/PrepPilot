@@ -11,6 +11,7 @@ export const COMMON_NAV: NavigationItem[] = [
   { id: 'tasks',       label: 'Tasks',            path: '/tasks',       icon: 'CalendarCheck' },
   { id: 'dsa',         label: 'DSA Tracker',      path: '/dsa',         icon: 'Code2' },
   { id: 'interview',   label: 'Mock Interview',   path: '/interview',   icon: 'Video' },
+  { id: 'leetcode',    label: 'LeetCode',         path: '/leetcode',    icon: 'Code2' },
   { id: 'progress',    label: 'Progress',         path: '/progress',    icon: 'TrendingUp' },
   { id: 'canvas',      label: 'Learning Canvas',  path: '/canvas',      icon: 'MonitorPlay' },
   { id: 'coach',       label: 'AI Coach',         path: '/coach',       icon: 'BotMessageSquare' },
