@@ -153,8 +153,8 @@ export interface CanvasStep {
   line: number | null;
   variables: CanvasVariable;
   array: (number | string | null)[];
-  pointers: CanvasPointer;
-  markers: Record<string, number>;
+  pointers?: CanvasPointer;
+  markers: Record<string, number | string>;
   explanation: string;
   highlightIndices?: number[];
 }
@@ -162,7 +162,9 @@ export interface CanvasStep {
 export interface CanvasArtifact {
   title: string;
   language: string;
+  description?: string;
   code: string[];
+  variables?: string[];
   steps: CanvasStep[];
 }
 

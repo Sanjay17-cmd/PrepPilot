@@ -10,7 +10,7 @@ import { Input } from '../../components/ui/Input'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingSpinner } from '../../components/ui/Loading'
 import { APP_CONFIG } from '../../config/app'
-import { BookOpen, LayoutDashboard, Inbox, Tag, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react'
+import { BookOpen, LayoutDashboard, Inbox, Tag, CheckCircle, XCircle, Clock, ExternalLink, BarChart2 } from 'lucide-react'
 import type { RoleRequest, Role } from '../../types'
 import { formatDate } from '../../lib/utils'
 
@@ -27,6 +27,7 @@ export function AdminLayout() {
           { label: 'Overview',      path: '/admin',               icon: <LayoutDashboard size={15} /> },
           { label: 'Role Requests', path: '/admin/role-requests', icon: <Inbox size={15} /> },
           { label: 'Roles',         path: '/admin/roles',         icon: <Tag size={15} /> },
+          { label: 'AI Usage',      path: '/admin/ai-usage',      icon: <BarChart2 size={15} /> },
         ].map(item => (
           <NavLink
             key={item.path}

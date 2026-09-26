@@ -1,4 +1,3 @@
-import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './features/auth/AuthContext'
 import { ToastProvider } from './components/ui/Toast'
@@ -13,10 +12,17 @@ import { SettingsPage } from './pages/settings/SettingsPage'
 import {
   AdminLayout, AdminOverviewPage, AdminRoleRequestsPage, AdminRolesPage,
 } from './pages/admin/AdminPages'
-import {
-  AssessmentPage, RoadmapPage, DailyPlanPage, ProgressPage,
-  AICoachPage, ResumePage, NotFoundPage,
-} from './pages/PageShells'
+import { AdminAIUsagePage } from './pages/admin/AdminAIUsagePage'
+import { NotFoundPage } from './pages/PageShells'
+import { AssessmentPage } from './pages/assessment/AssessmentConfigPage'
+import { AssessmentActivePage } from './pages/assessment/AssessmentActivePage'
+import { AssessmentResultPage } from './pages/assessment/AssessmentResultPage'
+import { RoadmapPage } from './pages/roadmap/RoadmapPage'
+import { DailyPlanPage } from './pages/daily/DailyPlanPage'
+import { ProgressPage } from './pages/progress/ProgressPage'
+import { AICoachPage } from './pages/coach/AICoachPage'
+import { ResumePage } from './pages/resume/ResumePage'
+import { DSAPage } from './pages/dsa/DSAPage'
 
 export default function App() {
   return (
@@ -31,7 +37,7 @@ export default function App() {
             <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
 
             {/* ----------------------------------------------------------------
-                Onboarding — protected but not onboarding-completed required
+                Onboarding — protected but onboarding-completed not required
             ---------------------------------------------------------------- */}
             <Route
               path="/onboarding/*"
@@ -40,6 +46,19 @@ export default function App() {
                   <OnboardingLayout />
                 </ProtectedRoute>
               }
+            />
+
+            {/* ----------------------------------------------------------------
+                Assessment active + result — standalone (no sidebar, fullscreen)
+                Must be BEFORE the AppLayout routes so they don't inherit sidebar
+            ---------------------------------------------------------------- */}
+            <Route
+              path="/assessment/active/:assessmentId/:attemptId"
+              element={<ProtectedRoute><AssessmentActivePage /></ProtectedRoute>}
+            />
+            <Route
+              path="/assessment/result/:attemptId"
+              element={<ProtectedRoute><AssessmentResultPage /></ProtectedRoute>}
             />
 
             {/* ----------------------------------------------------------------
@@ -56,6 +75,7 @@ export default function App() {
               <Route path="/assessment" element={<AssessmentPage />} />
               <Route path="/roadmap"    element={<RoadmapPage />} />
               <Route path="/daily"      element={<DailyPlanPage />} />
+              <Route path="/dsa"        element={<DSAPage />} />
               <Route path="/progress"   element={<ProgressPage />} />
               <Route path="/canvas"     element={<CanvasPage />} />
               <Route path="/coach"      element={<AICoachPage />} />
@@ -75,9 +95,10 @@ export default function App() {
               }
             >
               <Route element={<AdminLayout />}>
-                <Route index           element={<AdminOverviewPage />} />
+                <Route index               element={<AdminOverviewPage />} />
                 <Route path="role-requests" element={<AdminRoleRequestsPage />} />
-                <Route path="roles"    element={<AdminRolesPage />} />
+                <Route path="roles"         element={<AdminRolesPage />} />
+                <Route path="ai-usage"      element={<AdminAIUsagePage />} />
               </Route>
             </Route>
 

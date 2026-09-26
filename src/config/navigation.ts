@@ -9,10 +9,11 @@ export const COMMON_NAV: NavigationItem[] = [
   { id: 'assessment',  label: 'Where Are We?',    path: '/assessment',  icon: 'ClipboardCheck' },
   { id: 'roadmap',     label: 'Roadmap',          path: '/roadmap',     icon: 'Map' },
   { id: 'daily',       label: 'Daily Plan',       path: '/daily',       icon: 'CalendarCheck' },
+  { id: 'dsa',         label: 'DSA Tracker',      path: '/dsa',         icon: 'Code2' },
   { id: 'progress',    label: 'Progress',         path: '/progress',    icon: 'TrendingUp' },
   { id: 'canvas',      label: 'Learning Canvas',  path: '/canvas',      icon: 'MonitorPlay' },
-  { id: 'coach',       label: 'AI Coach',         path: '/coach',       icon: 'BotMessageSquare', comingSoon: true },
-  { id: 'resume',      label: 'Resume',           path: '/resume',      icon: 'FileText',          comingSoon: true },
+  { id: 'coach',       label: 'AI Coach',         path: '/coach',       icon: 'BotMessageSquare' },
+  { id: 'resume',      label: 'Resume',           path: '/resume',      icon: 'FileText' },
 ]
 
 export const SETTINGS_NAV: NavigationItem[] = [
@@ -23,6 +24,7 @@ export const ADMIN_NAV: NavigationItem[] = [
   { id: 'admin-overview',  label: 'Overview',      path: '/admin',               icon: 'LayoutDashboard' },
   { id: 'admin-requests',  label: 'Role Requests', path: '/admin/role-requests', icon: 'Inbox' },
   { id: 'admin-roles',     label: 'Roles',         path: '/admin/roles',         icon: 'Tag' },
+  { id: 'admin-ai-usage',  label: 'AI Usage',      path: '/admin/ai-usage',      icon: 'BarChart2' },
 ]
 
 /**
@@ -32,7 +34,6 @@ export const ADMIN_NAV: NavigationItem[] = [
  */
 export const ROLE_MODULE_NAV: Record<string, NavigationItem[]> = {
   'software-developer': [
-    { id: 'mod-dsa',      label: 'DSA',             path: '/modules/dsa',      icon: 'BinaryTree',  comingSoon: true },
     { id: 'mod-cs',       label: 'CS Fundamentals', path: '/modules/cs',       icon: 'Cpu',         comingSoon: true },
     { id: 'mod-projects', label: 'Projects',        path: '/modules/projects', icon: 'FolderGit2',  comingSoon: true },
   ],

@@ -1,262 +1,509 @@
-// Supabase AI Gateway Edge Function — Phase 1 Skeleton
-// Located at: supabase/functions/ai-gateway/index.ts
-//
-// Deploy with: supabase functions deploy ai-gateway
-//
-// Required environment variables (set in Supabase Dashboard → Edge Functions → Secrets):
-//   GEMINI_API_KEY_1   — primary key
-//   GEMINI_API_KEY_2   — first fallback
-//   GEMINI_API_KEY_3   — second fallback
-//   SUPABASE_URL       — auto-provided by Supabase
-//   SUPABASE_SERVICE_ROLE_KEY — auto-provided by Supabase
-//
-// IMPORTANT:
-//   - Never expose these keys in frontend code.
-//   - Key slots are for fallback/isolation, NOT quota multiplication.
-
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// Environment keys (set in Supabase Edge Function secrets)
+// -------------------------------------------------------------------------
+const GEMINI_KEYS = [
+  Deno.env.get('GEMINI_API_KEY_1'),
+  Deno.env.get('GEMINI_API_KEY_2'),
+  Deno.env.get('GEMINI_API_KEY_3'),
+].filter(Boolean) as string[]
 
-interface GatewayRequest {
-  feature: string          // e.g. 'roadmap', 'canvas', 'assessment'
-  model?: string           // e.g. 'gemini-1.5-flash' — defaults to flash
-  prompt_version?: string  // e.g. 'v1.0'
-  input: Record<string, unknown>
-  student_id?: string
-  request_hash?: string    // pre-computed SHA256 — skip Gemini if cache hit
+const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
+
+// All supported features
+const SUPPORTED_FEATURES = new Set([
+  // Phase 2
+  'mcq_generation',
+  'roadmap_generation',
+  'daily_plan_generation',
+  // Phase 3
+  'ai_coach',
+  'resume_analysis',
+  'canvas_generation',
+])
+
+// Model selection per feature
+const FEATURE_MODELS: Record<string, string> = {
+  mcq_generation:        'gemini-1.5-flash',
+  roadmap_generation:    'gemini-1.5-flash',
+  daily_plan_generation: 'gemini-1.5-flash',
+  ai_coach:              'gemini-1.5-flash',
+  resume_analysis:       'gemini-1.5-flash',
+  canvas_generation:     'gemini-1.5-flash',
 }
 
-interface GatewayResponse {
-  success: boolean
-  data?: Record<string, unknown>
-  ai_run_id?: string
-  cached?: boolean
-  error?: string
-}
+// Features for which we NEVER use the output cache (always fresh)
+const NO_CACHE_FEATURES = new Set(['ai_coach'])
 
-// ---------------------------------------------------------------------------
-// Key rotation — fallback chain: slot 1 → slot 2 → slot 3
-// ---------------------------------------------------------------------------
-
-function getApiKeys(): string[] {
-  const keys: string[] = []
-  const k1 = Deno.env.get('GEMINI_API_KEY_1')
-  const k2 = Deno.env.get('GEMINI_API_KEY_2')
-  const k3 = Deno.env.get('GEMINI_API_KEY_3')
-  if (k1) keys.push(k1)
-  if (k2) keys.push(k2)
-  if (k3) keys.push(k3)
-  return keys
-}
-
-// ---------------------------------------------------------------------------
-// Cache check — reuse existing ai_runs output if request_hash matches
-// ---------------------------------------------------------------------------
-
-async function checkCache(
-  supabase: ReturnType<typeof createClient>,
-  request_hash: string,
-  feature: string
-): Promise<Record<string, unknown> | null> {
-  const { data } = await supabase
-    .from('ai_runs')
-    .select('id, output_json')
-    .eq('request_hash', request_hash)
-    .eq('feature', feature)
-    .eq('status', 'success')
-    .limit(1)
-    .maybeSingle()
-
-  return data?.output_json ?? null
-}
-
-// ---------------------------------------------------------------------------
-// Gemini call with key fallback
-// ---------------------------------------------------------------------------
-
+// -------------------------------------------------------------------------
+// Gemini call with multi-key fallback
+// -------------------------------------------------------------------------
 async function callGemini(
-  keys: string[],
-  model: string,
-  prompt: string
-): Promise<{ output: Record<string, unknown>; key_slot: number; usage: Record<string, unknown> }> {
-  let lastError: Error | null = null
+  prompt: string,
+  feature: string,
+): Promise<{ content: string; keySlot: number; model: string; usage: Record<string, number> }> {
+  if (GEMINI_KEYS.length === 0) throw new Error('No Gemini API keys configured.')
 
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i]
-    const slot = i + 1
+  const model   = FEATURE_MODELS[feature] ?? 'gemini-1.5-flash'
+  let lastError = ''
 
+  for (let slot = 0; slot < GEMINI_KEYS.length; slot++) {
+    const key = GEMINI_KEYS[slot]
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`
+      const res = await fetch(
+        `${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature:     0.4,
+              topP:            0.9,
+              maxOutputTokens: 8192,
+              responseMimeType: 'application/json',
+            },
+          }),
+        },
+      )
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        lastError = new Error(`Gemini slot ${slot} HTTP ${response.status}: ${errorText}`)
-        console.warn(`AI Gateway: key slot ${slot} failed, trying next...`)
+      if (!res.ok) {
+        const errBody = await res.text()
+        lastError = `Key slot ${slot + 1}: HTTP ${res.status} — ${errBody.slice(0, 200)}`
         continue
       }
 
-      const result = await response.json()
-      const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}'
-
-      let output: Record<string, unknown>
-      try {
-        output = JSON.parse(rawText)
-      } catch {
-        throw new Error(`Gemini returned non-JSON output from slot ${slot}`)
+      const data = await res.json()
+      const content = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+      const usage   = {
+        prompt_tokens:     data?.usageMetadata?.promptTokenCount     ?? 0,
+        completion_tokens: data?.usageMetadata?.candidatesTokenCount ?? 0,
+        total_tokens:      data?.usageMetadata?.totalTokenCount      ?? 0,
       }
 
-      const usage = result?.usageMetadata ?? {}
-
-      return { output, key_slot: slot, usage }
-
+      return { content, keySlot: slot + 1, model, usage }
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err))
-      console.warn(`AI Gateway: key slot ${slot} error:`, lastError.message)
+      lastError = `Key slot ${slot + 1}: ${err}`
     }
   }
 
-  throw lastError ?? new Error('All Gemini key slots failed')
+  throw new Error(`All Gemini keys failed. Last error: ${lastError}`)
 }
 
-// ---------------------------------------------------------------------------
-// Main handler
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// Phase 2 prompt builders
+// -------------------------------------------------------------------------
+function buildMCQPrompt(body: Record<string, unknown>): string {
+  const role        = body.role        as string
+  const topics      = body.topics      as string[]
+  const difficulty  = body.difficulty  as string
+  const poolSize    = body.pool_size   as number
+  const diffDist    = body.diff_distribution as Record<string, number>
 
-Deno.serve(async (req: Request) => {
+  const topicList = topics.join(', ')
+  const diffInstr = difficulty === 'adaptive'
+    ? `Distribute questions as follows: Easy: ${diffDist.easy}, Medium: ${diffDist.medium}, Hard: ${diffDist.hard}.`
+    : `All ${poolSize} questions should be ${difficulty} difficulty.`
+
+  return `You are generating a placement preparation MCQ question pool for a student preparing for a ${role} role.
+
+Generate exactly ${poolSize} multiple-choice questions on these topics: ${topicList}
+
+${diffInstr}
+
+Rules:
+- Every question must have exactly 4 options labeled A, B, C, D
+- Each option text should NOT include the label (e.g., write "Binary search" not "A: Binary search")
+- correct_answer must be one of: "A", "B", "C", "D"
+- difficulty must be one of: "easy", "medium", "hard"
+- Questions must be placement-exam appropriate (technical, specific, unambiguous)
+- Do NOT repeat questions
+- Ensure at least one question per topic if possible
+- Include meaningful distractors (wrong answers that look plausible)
+
+Return ONLY valid JSON in this exact format (no markdown, no explanation):
+{
+  "questions": [
+    {
+      "question_id": "q_001",
+      "topic": "<topic name exactly as in the list>",
+      "subtopic": "<specific subtopic>",
+      "difficulty": "easy|medium|hard",
+      "question": "<the question text>",
+      "options": ["<option A text>", "<option B text>", "<option C text>", "<option D text>"],
+      "correct_answer": "A|B|C|D",
+      "explanation": "<why the correct answer is correct>",
+      "concept": "<the underlying concept being tested>"
+    }
+  ]
+}
+
+Generate exactly ${poolSize} questions now.`
+}
+
+function buildRoadmapPrompt(body: Record<string, unknown>): string {
+  const input = JSON.stringify(body.student_state ?? body, null, 2)
+  return `You are generating a personalized placement preparation roadmap.
+
+Student data:
+${input}
+
+Return ONLY valid JSON in this format:
+{
+  "roadmap": {
+    "name": "<roadmap name>",
+    "role": "<role>",
+    "total_days": <number>,
+    "phases": [
+      {
+        "title": "<phase title>",
+        "duration_days": <number>,
+        "description": "<brief description>",
+        "topics": [
+          {
+            "name": "<topic>",
+            "priority": "high|medium|low",
+            "estimated_minutes": <number>,
+            "focus_areas": ["<area1>", "<area2>"]
+          }
+        ]
+      }
+    ]
+  }
+}`
+}
+
+function buildDailyPlanPrompt(body: Record<string, unknown>): string {
+  const input = JSON.stringify(body.roadmap_context ?? body, null, 2)
+  return `Generate a focused daily study plan for placement preparation.
+
+Context:
+${input}
+
+Return ONLY valid JSON:
+{
+  "plan": {
+    "date": "<YYYY-MM-DD>",
+    "total_minutes": <number>,
+    "tasks": [
+      {
+        "topic": "<topic>",
+        "title": "<task title>",
+        "description": "<what to study>",
+        "estimated_minutes": <number>,
+        "priority": "high|medium|low",
+        "display_order": <number>
+      }
+    ]
+  }
+}`
+}
+
+// -------------------------------------------------------------------------
+// Phase 3: AI Coach prompt
+// -------------------------------------------------------------------------
+function buildCoachPrompt(body: Record<string, unknown>): string {
+  const userMessage = body.user_message as string
+  const studentCtx  = body.student_context ?? {}
+  const recentMsgs  = (body.recent_messages as Array<{sender:string; content:string}>) ?? []
+
+  const recentConv = recentMsgs.slice(-6).map(m => `${m.sender === 'user' ? 'Student' : 'Coach'}: ${m.content}`).join('\n')
+
+  return `You are PrepPilot AI Coach — a placement preparation assistant.
+
+You help students understand where they stand, what to study, and how to adjust their preparation plans.
+
+## Student Context (compact):
+${JSON.stringify(studentCtx, null, 2)}
+
+## Recent conversation:
+${recentConv || '(No previous messages)'}
+
+## Student says:
+"${userMessage}"
+
+## Your task:
+Classify the intent and respond appropriately.
+
+Intent types:
+- "info": General question, no DB change needed
+- "explanation": Wants an explanation of a topic/concept
+- "planning": Wants to know what to study / schedule advice
+- "db_change": Wants to modify daily plan, roadmap, tasks, or roles
+
+Respond ONLY with valid JSON:
+{
+  "intent": "info|explanation|planning|db_change",
+  "response": "<your coach response visible to the student>",
+  "requires_confirmation": false,
+  "proposed_patch": null
+}
+
+If intent is "db_change", set requires_confirmation to true and include:
+{
+  "intent": "db_change",
+  "response": "<explain what you propose to do>",
+  "requires_confirmation": true,
+  "proposed_patch": {
+    "summary": "<one-line description of the change>",
+    "operations": [
+      {
+        "operation": "<one of: complete_task | move_task | remove_task | reopen_task | create_daily_plan | regenerate_daily_plan | rename_roadmap | pause_roadmap | resume_roadmap | add_role | remove_role>",
+        "<relevant_fields>": "<values>"
+      }
+    ]
+  }
+}
+
+Rules:
+- Never modify the database directly
+- Never invent task IDs or entity IDs — leave them null, the app will resolve them
+- For "complete_task" operations, include: {"operation":"complete_task","task_title":"<title>"}
+- For "move_task", include: {"operation":"move_task","task_title":"<title>","to_date":"YYYY-MM-DD"}
+- Keep response concise and focused on placement preparation
+- Do not make up student data — use only what is in the context
+- If information is missing from context, say so honestly`
+}
+
+// -------------------------------------------------------------------------
+// Phase 3: Resume analysis prompt
+// -------------------------------------------------------------------------
+function buildResumeAnalysisPrompt(body: Record<string, unknown>): string {
+  const resumeText  = body.resume_text as string
+  const roleName    = body.role_name   as string
+  const roleKeywords = (body.role_keywords as string[]) ?? []
+
+  return `You are an expert resume reviewer for placement preparation in India.
+
+Target role: ${roleName}
+Key skills for this role: ${roleKeywords.join(', ')}
+
+Resume text:
+---
+${resumeText.slice(0, 6000)}
+---
+
+Analyze this resume for ATS-oriented quality and role fit. Be honest and specific.
+Do NOT invent achievements, numbers, or technologies not present in the resume.
+
+Return ONLY valid JSON:
+{
+  "overall_score": <0-100>,
+  "score_breakdown": {
+    "keyword_match": <0-100>,
+    "content_structure": <0-100>,
+    "role_relevance": <0-100>,
+    "project_strength": <0-100>,
+    "impact_statements": <0-100>,
+    "readability": <0-100>
+  },
+  "keywords_found": ["<keyword1>", "..."],
+  "keywords_missing": ["<keyword1>", "..."],
+  "sections_found": ["contact", "education", "skills", "projects"],
+  "sections_missing": ["experience", "certifications"],
+  "strengths": ["<specific strength from resume>"],
+  "recommendations": [
+    {
+      "priority": "high|medium|low",
+      "section": "<section name>",
+      "issue": "<specific issue found>",
+      "suggestion": "<specific actionable fix>",
+      "current_text": "<optional: exact problematic text from resume>",
+      "suggested_text": "<optional: suggested replacement>"
+    }
+  ],
+  "summary": "<2-3 sentence overall assessment>"
+}`
+}
+
+// -------------------------------------------------------------------------
+// Phase 3: Canvas generation prompt
+// -------------------------------------------------------------------------
+function buildCanvasPrompt(body: Record<string, unknown>): string {
+  const userPrompt = body.prompt   as string
+  const language   = (body.language as string) ?? 'python'
+
+  return `You are an algorithm visualization generator for a placement preparation tool.
+
+Student request: "${userPrompt}"
+Language: ${language}
+
+Generate a complete step-by-step algorithm visualization.
+
+Return ONLY valid JSON matching this schema:
+{
+  "title": "<algorithm name>",
+  "language": "${language}",
+  "description": "<one sentence description>",
+  "code": ["<line 1>", "<line 2>", "..."],
+  "variables": ["<var1>", "<var2>"],
+  "steps": [
+    {
+      "step": 1,
+      "line": <1-indexed line number of active code line>,
+      "explanation": "<clear, concise explanation of what happens at this step>",
+      "variables": {
+        "<var_name>": "<current value as string>"
+      },
+      "markers": {
+        "<pointer_name>": "<index or value>"
+      },
+      "array": [<values or null for empty>],
+      "highlightIndices": [<index numbers to highlight>]
+    }
+  ]
+}
+
+Rules:
+- code must be an array of strings, one per line
+- steps must cover the full algorithm execution with a representative example
+- Keep steps between 5 and 20 (use a concrete small example)
+- variables must show actual values at each step (not placeholders)
+- array can be empty [] if the algorithm doesn't use arrays
+- explanation must be clear and educational (2-4 sentences)
+- markers shows named pointers like low, high, mid, i, j, left, right, etc.
+- highlightIndices shows which array positions are active/relevant at this step`
+}
+
+// -------------------------------------------------------------------------
+// Hash a request body deterministically for cache lookup
+// -------------------------------------------------------------------------
+function hashRequest(body: unknown): string {
+  const str = JSON.stringify(body)
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + c
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(36)
+}
+
+// -------------------------------------------------------------------------
+// Main handler
+// -------------------------------------------------------------------------
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
+    return new Response('ok', {
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin':  '*',
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
       },
     })
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-  let body: GatewayRequest
   try {
-    body = await req.json()
-  } catch {
-    return Response.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
-  }
+    const body: Record<string, unknown> = await req.json()
+    const feature = body.feature as string ?? 'unknown'
 
-  const { feature, model = 'gemini-1.5-flash', prompt_version = 'v1.0', input, student_id, request_hash } = body
-
-  if (!feature || !input) {
-    return Response.json({ success: false, error: 'feature and input are required' }, { status: 400 })
-  }
-
-  // ---------------------------------------------------------------------------
-  // RULE: Check cache before calling Gemini
-  // ---------------------------------------------------------------------------
-  if (request_hash) {
-    const cached = await checkCache(supabase, request_hash, feature)
-    if (cached) {
-      return Response.json({
-        success: true,
-        data: cached,
-        cached: true,
-      } satisfies GatewayResponse)
+    if (!SUPPORTED_FEATURES.has(feature)) {
+      return Response.json({ error: `Feature '${feature}' is not available.` }, { status: 400 })
     }
-  }
 
-  // ---------------------------------------------------------------------------
-  // RULE: Never call Gemini for Phase 1 features that don't need it
-  // ---------------------------------------------------------------------------
-  const PHASE1_BLOCKED_FEATURES = ['roadmap', 'canvas', 'assessment', 'chat', 'daily_plan']
-  if (PHASE1_BLOCKED_FEATURES.includes(feature)) {
-    return Response.json({
-      success: false,
-      error: `Feature '${feature}' is not yet enabled. AI gateway is ready but Gemini calls for this feature are gated to Phase 2.`,
-    } satisfies GatewayResponse, { status: 422 })
-  }
+    // Extract student ID from auth header
+    const authHeader = req.headers.get('Authorization')
+    const userToken  = authHeader?.replace('Bearer ', '') ?? ''
+    const { data: { user } } = await supabase.auth.getUser(userToken)
+    const studentId = user?.id ?? null
 
-  // ---------------------------------------------------------------------------
-  // Gemini call
-  // ---------------------------------------------------------------------------
-  const keys = getApiKeys()
-  if (keys.length === 0) {
-    return Response.json({ success: false, error: 'No Gemini API keys configured on server.' }, { status: 500 })
-  }
+    // Cache check (skip for chat)
+    const requestHash   = hashRequest({ feature, ...body })
+    const promptVersion = (body.prompt_version as string) ?? 'v1.0'
 
-  // Create a pending ai_runs record
-  const { data: runRow } = await supabase
-    .from('ai_runs')
-    .insert({
-      student_id: student_id ?? null,
-      feature,
-      provider: 'gemini',
-      model,
-      prompt_version,
-      request_hash: request_hash ?? null,
-      input_json: input,
-      status: 'pending',
-    })
-    .select('id')
-    .single()
+    if (!NO_CACHE_FEATURES.has(feature)) {
+      const { data: cached } = await supabase
+        .from('ai_runs')
+        .select('id, output_json')
+        .eq('request_hash', requestHash)
+        .eq('prompt_version', promptVersion)
+        .eq('status', 'success')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
 
-  const runId = runRow?.id
+      if (cached?.output_json) {
+        return Response.json({
+          ...cached.output_json,
+          ai_run_id:  cached.id,
+          from_cache: true,
+        }, {
+          headers: { 'Access-Control-Allow-Origin': '*' },
+        })
+      }
+    }
 
-  try {
-    // Build prompt — in Phase 2, each feature will have its own prompt builder.
-    const prompt = `You are an AI assistant for a placement preparation platform. Feature: ${feature}. Input: ${JSON.stringify(input)}. Respond with valid JSON only.`
+    // Build prompt
+    let prompt = ''
+    switch (feature) {
+      case 'mcq_generation':        prompt = buildMCQPrompt(body);           break
+      case 'roadmap_generation':    prompt = buildRoadmapPrompt(body);       break
+      case 'daily_plan_generation': prompt = buildDailyPlanPrompt(body);     break
+      case 'ai_coach':              prompt = buildCoachPrompt(body);          break
+      case 'resume_analysis':       prompt = buildResumeAnalysisPrompt(body);break
+      case 'canvas_generation':     prompt = buildCanvasPrompt(body);        break
+      default: throw new Error(`Unknown feature: ${feature}`)
+    }
 
-    const { output, key_slot, usage } = await callGemini(keys, model, prompt)
+    // Call Gemini with fallback
+    const { content, keySlot, model, usage } = await callGemini(prompt, feature)
 
-    // Update ai_runs record with success
-    await supabase
+    // Parse JSON response
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(content)
+    } catch {
+      const match = content.match(/\{[\s\S]*\}/)
+      if (!match) throw new Error('Gemini returned invalid JSON')
+      parsed = JSON.parse(match[0])
+    }
+
+    // Save to ai_runs
+    const { data: runRecord } = await supabase
       .from('ai_runs')
-      .update({
-        output_json: output,
-        usage_json: usage,
-        key_slot,
-        status: 'success',
+      .insert({
+        student_id:     studentId,
+        feature,
+        model,
+        key_slot:       keySlot,
+        request_hash:   requestHash,
+        prompt_version: promptVersion,
+        input_json:     body,
+        output_json:    parsed,
+        usage_json:     usage,
+        status:         'success',
       })
-      .eq('id', runId)
+      .select('id')
+      .single()
 
     return Response.json({
-      success: true,
-      data: output,
-      ai_run_id: runId,
-      cached: false,
-    } satisfies GatewayResponse)
+      ...parsed,
+      ai_run_id:  runRecord?.id ?? null,
+      from_cache: false,
+    }, {
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    })
 
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err)
+    const message = err instanceof Error ? err.message : String(err)
 
-    // Update ai_runs record with error
-    if (runId) {
-      await supabase
-        .from('ai_runs')
-        .update({
-          status: 'error',
-          error_json: { message: errorMessage },
-        })
-        .eq('id', runId)
-    }
+    try {
+      await supabase.from('ai_runs').insert({
+        feature: 'unknown',
+        status:  'error',
+        error_message: message,
+      })
+    } catch { /* best-effort */ }
 
-    return Response.json({
-      success: false,
-      error: errorMessage,
-      ai_run_id: runId,
-    } satisfies GatewayResponse, { status: 500 })
+    return Response.json({ error: message }, {
+      status: 500,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    })
   }
 })

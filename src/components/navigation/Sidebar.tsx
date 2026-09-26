@@ -8,8 +8,8 @@ import {
   LayoutDashboard, ClipboardCheck, Map, CalendarCheck, TrendingUp,
   MonitorPlay, BotMessageSquare, FileText, Settings, LogOut, BookOpen,
   LayoutDashboard as AdminOverview, Inbox, Tag, Menu, X, Lock,
-  BinaryTree, Cpu, FolderGit2, Layout, Server, Plug, Code2,
-  BrainCircuit, Database, Network, Terminal, ShieldCheck,
+  GitBranch as BinaryTree, Cpu, FolderGit2, Layout, Server, Plug, Code2,
+  BrainCircuit, Database, Network, Terminal, ShieldCheck, BarChart2,
 } from 'lucide-react'
 import type { NavigationItem } from '../../types'
 
@@ -17,7 +17,7 @@ import type { NavigationItem } from '../../types'
 const ICONS: Record<string, React.ElementType> = {
   LayoutDashboard, ClipboardCheck, Map, CalendarCheck, TrendingUp,
   MonitorPlay, BotMessageSquare, FileText, Settings, LogOut, BookOpen,
-  Inbox, Tag, AdminOverview,
+  Inbox, Tag, AdminOverview, BarChart2,
   BinaryTree, Cpu, FolderGit2, Layout, Server, Plug, Code2,
   BrainCircuit, Database, Network, Terminal, ShieldCheck,
 }
