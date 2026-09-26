@@ -36,9 +36,7 @@ create index if not exists assessments_student_idx on public.assessments(student
 alter table public.assessments enable row level security;
 create policy "assessments: student reads own"       on public.assessments for select using (auth.uid() = student_id);
 create policy "assessments: student inserts own"     on public.assessments for insert with check (auth.uid() = student_id);
-create policy "assessments: admin reads all"         on public.assessments for select using (
-  exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-);
+create policy "assessments: admin reads all"         on public.assessments for select using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 2: ASSESSMENT ATTEMPTS
@@ -81,9 +79,7 @@ alter table public.assessment_attempts enable row level security;
 create policy "attempts: student reads own"   on public.assessment_attempts for select using (auth.uid() = student_id);
 create policy "attempts: student inserts own" on public.assessment_attempts for insert with check (auth.uid() = student_id);
 create policy "attempts: student updates own" on public.assessment_attempts for update using (auth.uid() = student_id);
-create policy "attempts: admin reads all"     on public.assessment_attempts for select using (
-  exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-);
+create policy "attempts: admin reads all"     on public.assessment_attempts for select using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 3: ASSESSMENT QUESTIONS
@@ -119,9 +115,7 @@ create policy "aq: student reads own" on public.assessment_questions for select 
   exists (select 1 from public.assessments where id = assessment_id and student_id = auth.uid())
 );
 -- Inserts happen via Edge Functions (service role)
-create policy "aq: admin reads all" on public.assessment_questions for select using (
-  exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-);
+create policy "aq: admin reads all" on public.assessment_questions for select using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 4: QUESTION ATTEMPTS
@@ -153,9 +147,7 @@ create index if not exists qa_topic_idx     on public.question_attempts(student_
 alter table public.question_attempts enable row level security;
 create policy "qa: student reads own"   on public.question_attempts for select using (auth.uid() = student_id);
 create policy "qa: student inserts own" on public.question_attempts for insert with check (auth.uid() = student_id);
-create policy "qa: admin reads all"     on public.question_attempts for select using (
-  exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-);
+create policy "qa: admin reads all"     on public.question_attempts for select using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 5: STUDENT SKILLS
@@ -189,9 +181,7 @@ create index if not exists skills_measured_at_idx   on public.student_skills(stu
 alter table public.student_skills enable row level security;
 create policy "skills: student reads own"   on public.student_skills for select using (auth.uid() = student_id);
 create policy "skills: student inserts own" on public.student_skills for insert with check (auth.uid() = student_id);
-create policy "skills: admin reads all"     on public.student_skills for select using (
-  exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-);
+create policy "skills: admin reads all"     on public.student_skills for select using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 6: DAILY PLANS

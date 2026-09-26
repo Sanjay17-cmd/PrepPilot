@@ -4,6 +4,7 @@
  */
 import { supabase } from '../../lib/supabase'
 import type { CanvasArtifact } from '../../types'
+import { getFallbackTemplate } from './data/fallbackTemplates'
 
 // ─── Hash prompt for cache ────────────────────────────────────────────────────
 function hashPrompt(prompt: string, language: string): string {
@@ -66,30 +67,36 @@ export async function generateCanvasArtifact(
     if (validated) return { artifact: validated, artifactId: cached.id, fromCache: true }
   }
 
-  // Call AI gateway
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
-
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-  const resp = await fetch(`${supabaseUrl}/functions/v1/ai-gateway`, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify({
-      feature:   'canvas_generation',
+  // Call AI gateway using Supabase client
+  const { data: raw, error: fnErr } = await supabase.functions.invoke('ai-gateway', {
+    body: {
+      feature:    'canvas_generation',
       student_id: studentId,
       prompt,
       language,
-    }),
+    },
   })
 
-  if (!resp.ok) throw new Error('Canvas generation failed')
-  const raw = await resp.json()
+  if (fnErr) {
+    let detail = fnErr.message || 'AI Gateway error'
+    try {
+      if ('context' in fnErr && (fnErr as any).context) {
+        const body = await (fnErr as any).context.json()
+        if (body?.error) detail = body.error
+      }
+    } catch { /* best effort */ }
+
+    // Check if we have a built-in fallback template matching this topic
+    const fallback = getFallbackTemplate(prompt)
+    if (fallback) {
+      return { artifact: fallback, artifactId: 'offline-template', fromCache: false }
+    }
+
+    throw new Error(detail)
+  }
 
   // Validate output
-  const artifact = validateArtifact(raw)
+  const artifact = validateArtifact(raw as Record<string, unknown>)
   if (!artifact) throw new Error('Invalid canvas structure returned by AI.')
 
   // Save to DB

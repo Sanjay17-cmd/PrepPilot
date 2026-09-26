@@ -30,7 +30,8 @@ export function ReviewStep({ onBack }: ReviewStepProps) {
       .eq('id', appUser!.auth.id)
 
     if (error) {
-      toastError('Something went wrong. Please try again.')
+      console.error('[ReviewStep] profile update error:', error)
+      toastError(error.message || 'Something went wrong. Please try again.')
       setCompleting(false)
       return
     }

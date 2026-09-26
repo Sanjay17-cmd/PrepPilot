@@ -151,13 +151,17 @@ export async function executePatch(
 
   // Audit log
   await supabase.from('audit_logs').insert({
-    actor_id:    studentId,
-    feature:     'ai_coach',
-    action:      'patch_executed',
-    source:      'AI_CHAT',
-    before_json: { items: preview.before },
-    after_json:  { items: preview.after },
-    metadata:    { patch_id: patchRecord?.id, operations: patch.operations },
+    actor_user_id: studentId,
+    actor_id:      studentId,
+    entity_type:   'ai_patch',
+    entity_id:     patchRecord?.id ?? null,
+    feature:       'ai_coach',
+    action:        'patch_executed',
+    source:        'AI_CHAT',
+    before_json:   { items: preview.before },
+    after_json:    { items: preview.after },
+    metadata_json: { patch_id: patchRecord?.id, operations: patch.operations },
+    metadata:      { patch_id: patchRecord?.id, operations: patch.operations },
   }).select().maybeSingle()
 
   if (errors.length > 0) {

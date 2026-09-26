@@ -156,32 +156,26 @@ export async function sendToCoach(
   recentMessages: ChatMessage[],
   studentContext: Record<string, unknown>,
 ): Promise<{ reply: ChatMessage; coachResponse: CoachResponse }> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
-
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-
-  const resp = await fetch(`${supabaseUrl}/functions/v1/ai-gateway`, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
+  const { data: raw, error: fnErr } = await supabase.functions.invoke('ai-gateway', {
+    body: {
+      feature:         'ai_coach',
+      student_id:      studentId,
+      user_message:    userMessage,
+      student_context: studentContext,
+      recent_messages: recentMessages.slice(-8).map(m => ({ sender: m.sender, content: m.content })),
     },
-    body: JSON.stringify({
-      feature:          'ai_coach',
-      student_id:       studentId,
-      user_message:     userMessage,
-      student_context:  studentContext,
-      recent_messages:  recentMessages.slice(-8).map(m => ({ sender: m.sender, content: m.content })),
-    }),
   })
 
-  if (!resp.ok) {
-    const err = await resp.text()
-    throw new Error(`Coach error: ${err}`)
+  if (fnErr) {
+    let detail = fnErr.message || 'Coach service unavailable'
+    try {
+      if ('context' in fnErr && (fnErr as any).context) {
+        const body = await (fnErr as any).context.json()
+        if (body?.error) detail = body.error
+      }
+    } catch { /* best effort */ }
+    throw new Error(detail)
   }
-
-  const raw = await resp.json()
 
   // Validate and extract
   const coachResponse: CoachResponse = {

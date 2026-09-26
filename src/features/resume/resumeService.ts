@@ -91,25 +91,26 @@ export async function uploadAndAnalyze(
 
   // 4. Call AI gateway
   const roleKeywords = ROLE_KEYWORDS[roleName] ?? []
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-
-  const resp = await fetch(`${supabaseUrl}/functions/v1/ai-gateway`, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify({
+  const { data: raw, error: fnErr } = await supabase.functions.invoke('ai-gateway', {
+    body: {
       feature:       'resume_analysis',
       student_id:    studentId,
       resume_text:   text,
       role_name:     roleName,
       role_keywords: roleKeywords,
-    }),
+    },
   })
 
-  if (!resp.ok) throw new Error('Resume analysis failed')
-  const raw = await resp.json()
+  if (fnErr) {
+    let detail = fnErr.message || 'Resume analysis failed'
+    try {
+      if ('context' in fnErr && (fnErr as any).context) {
+        const body = await (fnErr as any).context.json()
+        if (body?.error) detail = body.error
+      }
+    } catch { /* best effort */ }
+    throw new Error(detail)
+  }
 
   // 5. Save analysis
   const { data: analysis, error: aErr } = await supabase

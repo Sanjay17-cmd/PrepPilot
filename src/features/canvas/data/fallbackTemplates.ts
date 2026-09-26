@@ -1,0 +1,212 @@
+import type { CanvasArtifact } from '../../../types'
+import { MISSING_NUMBER_DEMO } from './missingNumber'
+
+export const BINARY_SEARCH_DEMO: CanvasArtifact = {
+  title: 'Binary Search',
+  language: 'python',
+  description: 'Search for target = 23 in a sorted array using divide-and-conquer.',
+  code: [
+    'def binary_search(arr, target):',
+    '    low = 0',
+    '    high = len(arr) - 1',
+    '    while low <= high:',
+    '        mid = (low + high) // 2',
+    '        if arr[mid] == target:',
+    '            return mid',
+    '        elif arr[mid] < target:',
+    '            low = mid + 1',
+    '        else:',
+    '            high = mid - 1',
+    '    return -1',
+  ],
+  variables: ['low', 'high', 'mid', 'target', 'arr[mid]'],
+  steps: [
+    {
+      step: 1,
+      line: 2,
+      explanation: 'Initialize low pointer to the beginning of array (index 0).',
+      variables: { low: 0, target: 23 },
+      markers: { low: 0 },
+      pointers: { low: 0 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [0],
+    },
+    {
+      step: 2,
+      line: 3,
+      explanation: 'Initialize high pointer to the last element of array (index 9).',
+      variables: { low: 0, high: 9, target: 23 },
+      markers: { low: 0, high: 9 },
+      pointers: { low: 0, high: 9 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [0, 9],
+    },
+    {
+      step: 3,
+      line: 5,
+      explanation: 'Calculate mid = (0 + 9) // 2 = 4. arr[4] = 16. Compare 16 with target 23.',
+      variables: { low: 0, high: 9, mid: 4, 'arr[mid]': 16, target: 23 },
+      markers: { low: 0, high: 9, mid: 4 },
+      pointers: { low: 0, high: 9, mid: 4 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [4],
+    },
+    {
+      step: 4,
+      line: 9,
+      explanation: 'arr[4] (16) < 23. Target must be in the right half. Update low = mid + 1 = 5.',
+      variables: { low: 5, high: 9, mid: 4, target: 23 },
+      markers: { low: 5, high: 9 },
+      pointers: { low: 5, high: 9 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [5, 6, 7, 8, 9],
+    },
+    {
+      step: 5,
+      line: 5,
+      explanation: 'Calculate new mid = (5 + 9) // 2 = 7. arr[7] = 56. Compare 56 with target 23.',
+      variables: { low: 5, high: 9, mid: 7, 'arr[mid]': 56, target: 23 },
+      markers: { low: 5, high: 9, mid: 7 },
+      pointers: { low: 5, high: 9, mid: 7 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [7],
+    },
+    {
+      step: 6,
+      line: 11,
+      explanation: 'arr[7] (56) > 23. Target must be in the left sub-portion. Update high = mid - 1 = 6.',
+      variables: { low: 5, high: 6, mid: 7, target: 23 },
+      markers: { low: 5, high: 6 },
+      pointers: { low: 5, high: 6 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [5, 6],
+    },
+    {
+      step: 7,
+      line: 5,
+      explanation: 'Calculate mid = (5 + 6) // 2 = 5. arr[5] = 23. Compare 23 with target 23.',
+      variables: { low: 5, high: 6, mid: 5, 'arr[mid]': 23, target: 23 },
+      markers: { low: 5, high: 6, mid: 5 },
+      pointers: { low: 5, high: 6, mid: 5 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [5],
+    },
+    {
+      step: 8,
+      line: 7,
+      explanation: 'Match found! arr[5] == 23. Return index 5 in O(log n) time.',
+      variables: { low: 5, high: 6, mid: 5, result: 5 },
+      markers: { found: 5 },
+      pointers: { found: 5 },
+      array: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+      highlightIndices: [5],
+    },
+  ],
+}
+
+export const TWO_POINTERS_DEMO: CanvasArtifact = {
+  title: 'Two Pointers (Two Sum Sorted)',
+  language: 'python',
+  description: 'Find two numbers that add up to target = 9 using two pointers from opposite ends.',
+  code: [
+    'def two_sum_sorted(numbers, target):',
+    '    left = 0',
+    '    right = len(numbers) - 1',
+    '    while left < right:',
+    '        current_sum = numbers[left] + numbers[right]',
+    '        if current_sum == target:',
+    '            return [left, right]',
+    '        elif current_sum < target:',
+    '            left += 1',
+    '        else:',
+    '            right -= 1',
+    '    return []',
+  ],
+  variables: ['left', 'right', 'current_sum', 'target'],
+  steps: [
+    {
+      step: 1,
+      line: 2,
+      explanation: 'Place left pointer at index 0 and right pointer at index 3.',
+      variables: { left: 0, right: 3, target: 9 },
+      markers: { left: 0, right: 3 },
+      pointers: { left: 0, right: 3 },
+      array: [2, 7, 11, 15],
+      highlightIndices: [0, 3],
+    },
+    {
+      step: 2,
+      line: 5,
+      explanation: 'Calculate current_sum = numbers[0] + numbers[3] = 2 + 15 = 17.',
+      variables: { left: 0, right: 3, current_sum: 17, target: 9 },
+      markers: { left: 0, right: 3 },
+      pointers: { left: 0, right: 3 },
+      array: [2, 7, 11, 15],
+      highlightIndices: [0, 3],
+    },
+    {
+      step: 3,
+      line: 11,
+      explanation: 'current_sum (17) > target (9). The sum is too large, so decrement right pointer to 2.',
+      variables: { left: 0, right: 2, target: 9 },
+      markers: { left: 0, right: 2 },
+      pointers: { left: 0, right: 2 },
+      array: [2, 7, 11, 15],
+      highlightIndices: [0, 2],
+    },
+    {
+      step: 4,
+      line: 5,
+      explanation: 'Calculate current_sum = numbers[0] + numbers[2] = 2 + 11 = 13.',
+      variables: { left: 0, right: 2, current_sum: 13, target: 9 },
+      markers: { left: 0, right: 2 },
+      pointers: { left: 0, right: 2 },
+      array: [2, 7, 11, 15],
+      highlightIndices: [0, 2],
+    },
+    {
+      step: 5,
+      line: 11,
+      explanation: 'current_sum (13) > target (9). Still too large. Decrement right pointer to 1.',
+      variables: { left: 0, right: 1, target: 9 },
+      markers: { left: 0, right: 1 },
+      pointers: { left: 0, right: 1 },
+      array: [2, 7, 11, 15],
+      highlightIndices: [0, 1],
+    },
+    {
+      step: 6,
+      line: 5,
+      explanation: 'Calculate current_sum = numbers[0] + numbers[1] = 2 + 7 = 9.',
+      variables: { left: 0, right: 1, current_sum: 9, target: 9 },
+      markers: { left: 0, right: 1 },
+      pointers: { left: 0, right: 1 },
+      array: [2, 7, 11, 15],
+      highlightIndices: [0, 1],
+    },
+    {
+      step: 7,
+      line: 7,
+      explanation: 'current_sum == target! Return indices [0, 1] corresponding to values 2 and 7.',
+      variables: { left: 0, right: 1, result: '[0, 1]' },
+      markers: { left: 0, right: 1 },
+      pointers: { left: 0, right: 1 },
+      array: [2, 7, 11, 15],
+      highlightIndices: [0, 1],
+    },
+  ],
+}
+
+export function getFallbackTemplate(query: string): CanvasArtifact | null {
+  const q = query.toLowerCase()
+  if (q.includes('binary') || q.includes('search')) {
+    return BINARY_SEARCH_DEMO
+  }
+  if (q.includes('two') || q.includes('pointer') || q.includes('sum')) {
+    return TWO_POINTERS_DEMO
+  }
+  if (q.includes('missing') || q.includes('number')) {
+    return MISSING_NUMBER_DEMO
+  }
+  return null
+}

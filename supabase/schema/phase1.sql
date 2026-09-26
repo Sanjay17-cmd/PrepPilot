@@ -71,6 +71,22 @@ create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute procedure public.set_updated_at();
 
+-- Helper: security definer function to avoid RLS recursion when checking admin status
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select coalesce(
+    (select user_type = 'admin' from public.profiles where id = auth.uid()),
+    false
+  );
+$$;
+
+grant execute on function public.is_admin() to authenticated, anon;
+
 -- RLS: profiles
 alter table public.profiles enable row level security;
 
@@ -79,25 +95,25 @@ create policy "profiles: student reads own"
   on public.profiles for select
   using (auth.uid() = id);
 
+-- Admins can read all profiles (uses security definer -> no recursion)
+create policy "profiles: admin reads all"
+  on public.profiles for select
+  using (public.is_admin());
+
 -- Students can update their own profile
 create policy "profiles: student updates own"
   on public.profiles for update
   using (auth.uid() = id)
   with check (
     auth.uid() = id
-    -- Prevent self-promotion to admin
-    and user_type = (select user_type from public.profiles where id = auth.uid())
+    -- Prevent self-promotion to admin unless already admin
+    and (user_type = 'student' or public.is_admin())
   );
 
--- Admins can read all profiles
-create policy "profiles: admin reads all"
-  on public.profiles for select
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.user_type = 'admin'
-    )
-  );
+-- Students can insert their own profile
+create policy "profiles: student inserts own"
+  on public.profiles for insert
+  with check (auth.uid() = id);
 
 -- =============================================================================
 -- SECTION 2: STUDENT EDUCATION
@@ -149,9 +165,7 @@ create policy "education: student updates own"
 
 create policy "education: admin reads all"
   on public.student_education for select
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 3: ROLES
@@ -191,21 +205,15 @@ create policy "roles: all authenticated can read active"
 
 create policy "roles: admin reads all"
   on public.roles for select
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 create policy "roles: admin insert"
   on public.roles for insert
-  with check (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  with check (public.is_admin());
 
 create policy "roles: admin update"
   on public.roles for update
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 4: STUDENT ROLES
@@ -245,9 +253,7 @@ create policy "student_roles: student updates own"
 
 create policy "student_roles: admin reads all"
   on public.student_roles for select
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 5: ROLE REQUESTS
@@ -287,15 +293,11 @@ create policy "role_requests: student inserts own"
 -- Students cannot update their own requests after submission (admin-only)
 create policy "role_requests: admin reads all"
   on public.role_requests for select
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 create policy "role_requests: admin updates"
   on public.role_requests for update
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 6: ROADMAPS
@@ -386,9 +388,7 @@ create policy "ai_runs: student reads own"
 -- Students cannot insert directly — writes happen via Edge Functions (service role)
 create policy "ai_runs: admin reads all"
   on public.ai_runs for select
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 8: AUDIT LOGS
@@ -418,9 +418,7 @@ alter table public.audit_logs enable row level security;
 
 create policy "audit_logs: admin reads all"
   on public.audit_logs for select
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and user_type = 'admin')
-  );
+  using (public.is_admin());
 
 -- =============================================================================
 -- SECTION 9: STORAGE BUCKETS (documentation — execute separately if needed)

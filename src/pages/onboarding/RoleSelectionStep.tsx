@@ -87,7 +87,8 @@ export function RoleSelectionStep({ onNext, onBack }: RoleSelectionStepProps) {
     const { error } = await supabase.from('student_roles').insert(inserts)
 
     if (error) {
-      toastError('Could not save roles. Please try again.')
+      console.error('[RoleSelectionStep] insert error:', error)
+      toastError(error.message || 'Could not save roles. Please try again.')
       setSaving(false)
       return
     }

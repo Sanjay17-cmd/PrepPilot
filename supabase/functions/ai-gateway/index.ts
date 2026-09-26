@@ -26,72 +26,81 @@ const SUPPORTED_FEATURES = new Set([
   'canvas_generation',
 ])
 
-// Model selection per feature
-const FEATURE_MODELS: Record<string, string> = {
-  mcq_generation:        'gemini-1.5-flash',
-  roadmap_generation:    'gemini-1.5-flash',
-  daily_plan_generation: 'gemini-1.5-flash',
-  ai_coach:              'gemini-1.5-flash',
-  resume_analysis:       'gemini-1.5-flash',
-  canvas_generation:     'gemini-1.5-flash',
-}
+// Active model candidates in priority order (Google retired gemini-1.5-flash)
+const CANDIDATE_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.5-pro',
+  'gemini-1.5-flash',
+]
 
 // Features for which we NEVER use the output cache (always fresh)
 const NO_CACHE_FEATURES = new Set(['ai_coach'])
 
 // -------------------------------------------------------------------------
-// Gemini call with multi-key fallback
+// Gemini call with multi-key and multi-model fallback
 // -------------------------------------------------------------------------
 async function callGemini(
   prompt: string,
-  feature: string,
+  _feature: string,
 ): Promise<{ content: string; keySlot: number; model: string; usage: Record<string, number> }> {
-  if (GEMINI_KEYS.length === 0) throw new Error('No Gemini API keys configured.')
+  if (GEMINI_KEYS.length === 0) throw new Error('No Gemini API keys configured in Edge Function secrets.')
 
-  const model   = FEATURE_MODELS[feature] ?? 'gemini-1.5-flash'
   let lastError = ''
 
   for (let slot = 0; slot < GEMINI_KEYS.length; slot++) {
     const key = GEMINI_KEYS[slot]
-    try {
-      const res = await fetch(
-        `${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`,
-        {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature:     0.4,
-              topP:            0.9,
-              maxOutputTokens: 8192,
-              responseMimeType: 'application/json',
-            },
-          }),
-        },
-      )
 
-      if (!res.ok) {
-        const errBody = await res.text()
-        lastError = `Key slot ${slot + 1}: HTTP ${res.status} — ${errBody.slice(0, 200)}`
-        continue
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const res = await fetch(
+          `${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`,
+          {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature:     0.4,
+                topP:            0.9,
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json',
+              },
+            }),
+          },
+        )
+
+        if (!res.ok) {
+          const errBody = await res.text()
+          lastError = `Key ${slot + 1} (${model}): HTTP ${res.status} — ${errBody.slice(0, 160)}`
+
+          // 404 means model retired or unsupported on this API version -> try next model candidate
+          if (res.status === 404) {
+            continue
+          }
+          // 429 means rate-limited / quota exhausted on this key -> switch to next key slot
+          if (res.status === 429) {
+            break
+          }
+          continue
+        }
+
+        const data = await res.json()
+        const content = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+        const usage   = {
+          prompt_tokens:     data?.usageMetadata?.promptTokenCount     ?? 0,
+          completion_tokens: data?.usageMetadata?.candidatesTokenCount ?? 0,
+          total_tokens:      data?.usageMetadata?.totalTokenCount      ?? 0,
+        }
+
+        return { content, keySlot: slot + 1, model, usage }
+      } catch (err) {
+        lastError = `Key ${slot + 1} (${model}): ${err}`
       }
-
-      const data = await res.json()
-      const content = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
-      const usage   = {
-        prompt_tokens:     data?.usageMetadata?.promptTokenCount     ?? 0,
-        completion_tokens: data?.usageMetadata?.candidatesTokenCount ?? 0,
-        total_tokens:      data?.usageMetadata?.totalTokenCount      ?? 0,
-      }
-
-      return { content, keySlot: slot + 1, model, usage }
-    } catch (err) {
-      lastError = `Key slot ${slot + 1}: ${err}`
     }
   }
 
-  throw new Error(`All Gemini keys failed. Last error: ${lastError}`)
+  throw new Error(`All Gemini keys and model fallbacks failed. Last error: ${lastError}`)
 }
 
 // -------------------------------------------------------------------------
@@ -495,9 +504,10 @@ serve(async (req) => {
 
     try {
       await supabase.from('ai_runs').insert({
-        feature: 'unknown',
+        feature: 'error_log',
+        model:   'unknown',
         status:  'error',
-        error_message: message,
+        error_json: { message },
       })
     } catch { /* best-effort */ }
 
