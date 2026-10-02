@@ -19,6 +19,7 @@ export type AllowedOperation =
   | 'pause_roadmap'
   | 'resume_roadmap'
   | 'add_role'
+  | 'remove_role'
   | 'update_daily_minutes'
   | 'update_roadmap_topic'
 

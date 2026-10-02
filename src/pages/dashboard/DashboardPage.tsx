@@ -282,35 +282,37 @@ export function DashboardPage() {
 
       {/* Role modules preview */}
       {primaryRoleModules.length > 0 && (
-        <div>
-          <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 'var(--space-4)' }}>
+        <div style={{ marginTop: 'var(--space-8)' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', color: 'var(--ink-black)', marginBottom: 'var(--space-4)' }}>
             Preparation Modules
-            <span style={{ marginLeft: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontWeight: 400 }}>
+            <span style={{ marginLeft: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--marker-blue)', fontFamily: 'var(--font-sans)', fontWeight: 700 }}>
               — {primaryRole?.role?.name}
             </span>
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-3)' }}>
             {primaryRoleModules.map((mod, i) => (
               <div
                 key={i}
                 style={{
                   padding: 'var(--space-3) var(--space-4)',
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--paper-white)',
+                  border: '2.5px solid var(--ink-black)',
+                  boxShadow: '2.5px 2.5px 0px var(--ink-black)',
+                  borderRadius: '10px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 'var(--space-2)',
+                  fontWeight: 700,
                 }}
               >
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{mod}</span>
-                <Lock size={12} color="var(--text-tertiary)" />
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--ink-black)' }}>{mod}</span>
+                <Lock size={14} color="var(--text-secondary)" />
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 'var(--space-3)' }}>
-            Modules unlock as you progress through your roadmap.
+          <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-secondary)', marginTop: 'var(--space-3)' }}>
+            ★ Modules unlock as you progress through your personalized study roadmap.
           </p>
         </div>
       )}

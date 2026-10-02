@@ -2,7 +2,7 @@ import React from 'react'
 import { cx } from '../../lib/utils'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
   size?: 'sm' | 'md' | 'lg'
   fullWidth?: boolean
   loading?: boolean
@@ -29,7 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={cx(
           'btn',
-          `btn--${variant}`,
+          variant === 'outline' ? 'btn--secondary' : `btn--${variant}`,
           size === 'sm' && 'btn--sm',
           size === 'lg' && 'btn--lg',
           fullWidth && 'btn--full',

@@ -18,8 +18,9 @@ export function AppLayout() {
             alignItems: 'center',
             gap: 'var(--space-3)',
             padding: 'var(--space-3) var(--space-4)',
-            borderBottom: '1px solid var(--border-color)',
-            background: 'var(--bg-surface)',
+            borderBottom: '3px solid var(--ink-black)',
+            background: 'var(--paper-white)',
+            boxShadow: '0 4px 0px var(--ink-black)',
             position: 'sticky',
             top: 0,
             zIndex: 30,
@@ -28,12 +29,12 @@ export function AppLayout() {
         >
           <button
             onClick={() => setMobileOpen(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-black)', display: 'flex', alignItems: 'center' }}
             aria-label="Open menu"
           >
-            <Menu size={20} />
+            <Menu size={22} />
           </button>
-          <span style={{ fontWeight: 700, fontSize: 'var(--text-base)', color: 'var(--text-primary)' }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: 'var(--marker-blue)', letterSpacing: '0.02em' }}>
             PrepPilot
           </span>
         </div>
